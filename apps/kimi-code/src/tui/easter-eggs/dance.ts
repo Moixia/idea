@@ -93,6 +93,7 @@ export function installRainbowDance(requestRender: () => void): () => void {
   currentDanceController?.dispose();
   const dance = new RainbowDance(requestRender);
   setRainbowDance(dance);
+  dance.start({ hold: true }); // always on from start
   return () => {
     dance.dispose();
     if (currentDanceController === dance) {

@@ -1,3 +1,6 @@
+import { stat } from 'node:fs/promises';
+import { dirname, join } from 'pathe';
+
 import type { McpServerConfig } from '#/config/schema';
 
 import { loadMcpServers } from './config-loader';
@@ -18,6 +21,26 @@ export async function resolveSessionMcpConfig(
     cwd: input.cwd,
     homeDir: input.homeDir,
   });
+
+  // ── Built-in lander MCP server ──────────────────────────────
+  // Resolve app root directory from the entry script (normal Node) or
+  // the executable itself (SEA), then try candidate locations for lander.exe.
+  const appRoot = dirname(process.argv[1] ?? process.execPath);
+  const candidates = [
+    join(appRoot, 'lander.exe'),                              // alongside the executable
+    join(appRoot, '..', 'lander', 'lander.exe'),               // apps/kimi-code/lander/ (dev)
+  ];
+  for (const landerPath of candidates) {
+    try {
+      await stat(landerPath);
+      servers['lander'] = { command: landerPath, transport: 'stdio' };
+      break;
+    } catch {
+      // try next candidate
+    }
+  }
+  // ────────────────────────────────────────────────────────────
+
   if (Object.keys(servers).length === 0) return undefined;
   return { servers };
 }

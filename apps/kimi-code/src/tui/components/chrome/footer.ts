@@ -135,6 +135,13 @@ function modelDisplayName(state: AppState): string {
   return model?.displayName ?? model?.model ?? state.model;
 }
 
+function modelFooterLabel(state: AppState): string {
+  const alias = state.availableModels[state.model];
+  if (!alias) return `Model: ${state.model}`;
+  const name = alias.displayName ?? alias.model;
+  return `Model: ${name} - ${alias.provider}`;
+}
+
 function shortenCwd(path: string): string {
   if (!path) return path;
   const home = process.env['HOME'] ?? '';
@@ -260,7 +267,7 @@ export class FooterComponent implements Component {
     const goalBadge = formatGoalBadge(state.goal, colors, this.goalWallClockMs(state.goal));
     if (goalBadge !== null) left.push(goalBadge);
 
-    const model = modelDisplayName(state);
+    const model = modelFooterLabel(state);
     if (model) {
       const thinkingLabel = state.thinking ? ' thinking' : '';
       const modelLabel = `${model}${thinkingLabel}`;

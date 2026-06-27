@@ -852,7 +852,10 @@ export class SessionEventHandler {
     switch (server.status) {
       case 'connected': {
         const toolStr = `${server.toolCount} tool${server.toolCount === 1 ? '' : 's'}`;
-        const message = `MCP server "${server.name}" connected · ${toolStr} (${server.transport})`;
+        const message =
+          server.name === 'lander'
+            ? 'Landa is connected and ready to use!'
+            : `MCP server "${server.name}" connected · ${toolStr} (${server.transport})`;
         this.finalizeMcpServerStatusRow(server.name, message, 'success');
         return;
       }
