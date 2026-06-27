@@ -231,7 +231,7 @@ async function handleBuiltInSlashCommand(
       host.showHelpPanel();
       return;
     case 'version':
-      host.showStatus(`Kimi Code v${host.state.appState.version}`);
+      host.showStatus(`Landa v${host.state.appState.version}`);
       return;
     case 'new':
       await host.createNewSession();

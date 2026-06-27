@@ -339,7 +339,7 @@ export async function refreshAllProviderModels(
           });
           changed.push({
             providerId: KIMI_CODE_PROVIDER_NAME,
-            providerName: 'Kimi Code',
+            providerName: 'Landa Code',
             added,
             removed,
           });

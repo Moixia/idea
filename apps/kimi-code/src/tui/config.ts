@@ -146,7 +146,7 @@ export function normalizeTuiConfig(config: TuiConfigFileShape): TuiConfig {
 
 export function renderTuiConfig(config: TuiConfig): string {
   return `# ~/.kimi-code/tui.toml
-# Client preferences for kimi-code.
+# Client preferences for Landa.
 # Agent/runtime settings stay in ~/.kimi-code/config.toml.
 
 theme = "${escapeTomlBasicString(config.theme)}" # "auto" | "dark" | "light" | custom theme name

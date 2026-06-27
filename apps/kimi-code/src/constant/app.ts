@@ -1,7 +1,7 @@
 import { ErrorCodes } from '@moonshot-ai/kimi-code-sdk';
 
-export const PRODUCT_NAME = 'Kimi Code';
-export const CLI_COMMAND_NAME = 'kimi';
+export const PRODUCT_NAME = 'Landa';
+export const CLI_COMMAND_NAME = 'landa';
 export const PROCESS_NAME = 'kimi-code';
 
 // Used in telemetry app names and HTTP User-Agent headers.

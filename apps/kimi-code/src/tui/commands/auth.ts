@@ -103,7 +103,7 @@ async function handleOpenPlatformLogin(
   platform: OpenPlatformDefinition,
 ): Promise<void> {
   const consoleHost = platform.consoleUrl?.replace(/^https?:\/\//, '') ?? '';
-  const platformName = consoleHost.length > 0 ? `Kimi Platform (${consoleHost})` : 'Kimi Platform';
+  const platformName = consoleHost.length > 0 ? `Landa Platform (${consoleHost})` : 'Landa Platform';
   const subtitleLines = [
     `${'base_url'.padEnd(12)}${platform.baseUrl}`,
     `${'saved to'.padEnd(12)}~/.kimi-code/config.toml`,
@@ -130,7 +130,7 @@ async function handleOpenPlatformLogin(
       error.status === 401
     ) {
       host.showStatus(
-        'Hint: If your API key was obtained from Kimi Code, please select "Kimi Code" instead.',
+        'Hint: If your API key was obtained from Landa, please select "Landa" instead.',
       );
     }
     return;
