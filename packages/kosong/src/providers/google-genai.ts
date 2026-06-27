@@ -763,7 +763,7 @@ export class GoogleGenAIChatProvider implements ChatProvider {
 
     const config: Record<string, unknown> = {
       ...this._generationKwargs,
-      system_instruction: systemPrompt,
+      systemInstruction: systemPrompt,
       ...(tools.length > 0 ? { tools: tools.map((t) => toolToGoogleGenAI(t)) } : {}),
     };
 

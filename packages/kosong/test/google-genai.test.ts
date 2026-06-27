@@ -128,7 +128,7 @@ describe('GoogleGenAIChatProvider', () => {
 
       expect(body['contents']).toEqual([{ parts: [{ text: 'Hello!' }], role: 'user' }]);
       const config = body['config'] as Record<string, unknown>;
-      expect(config['system_instruction']).toBe('You are helpful.');
+      expect(config['systemInstruction']).toBe('You are helpful.');
     });
 
     it('system messages in history are wrapped and emitted as user content', () => {
@@ -212,7 +212,7 @@ describe('GoogleGenAIChatProvider', () => {
       ]);
     });
 
-    it('multi-turn conversation with system prompt sets system_instruction', async () => {
+    it('multi-turn conversation with system prompt sets systemInstruction', async () => {
       const provider = createProvider();
       const history: Message[] = [
         { role: 'user', content: [{ type: 'text', text: 'What is 2+2?' }], toolCalls: [] },
@@ -228,7 +228,7 @@ describe('GoogleGenAIChatProvider', () => {
       ]);
 
       const config = body['config'] as Record<string, unknown>;
-      expect(config['system_instruction']).toBe('You are a math tutor.');
+      expect(config['systemInstruction']).toBe('You are a math tutor.');
     });
 
     it('tool definitions use parameters_json_schema', async () => {
@@ -587,7 +587,7 @@ describe('GoogleGenAIChatProvider', () => {
 
       expect(body['contents']).toEqual([{ parts: [{ text: 'Hello!' }], role: 'user' }]);
       const config = body['config'] as Record<string, unknown>;
-      expect(config['system_instruction']).toBe('You are helpful.');
+      expect(config['systemInstruction']).toBe('You are helpful.');
     });
   });
 
