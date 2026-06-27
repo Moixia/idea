@@ -64,4 +64,15 @@ describe('DefaultToolApprovePermissionPolicy', () => {
       ),
     ).toBeUndefined();
   });
+
+  it('auto-approves all MCP tools from lander server', () => {
+    expect(policy.evaluate(policyContext('mcp__lander__query', {}))).toEqual({ kind: 'approve' });
+    expect(policy.evaluate(policyContext('mcp__lander__search', {}))).toEqual({ kind: 'approve' });
+    expect(policy.evaluate(policyContext('mcp__lander__read', {}))).toEqual({ kind: 'approve' });
+  });
+
+  it('does not auto-approve MCP tools from other servers', () => {
+    expect(policy.evaluate(policyContext('mcp__github__listPRs', {}))).toBeUndefined();
+    expect(policy.evaluate(policyContext('mcp__filesystem__write', {}))).toBeUndefined();
+  });
 });
