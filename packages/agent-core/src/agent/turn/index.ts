@@ -655,14 +655,17 @@ export class TurnFlow {
           hooks: {
             beforeStep: async ({ signal: stepSignal }) => {
               this.flushSteerBuffer();
-              this.agent.microCompaction.detect();
-              await this.agent.fullCompaction.beforeStep(stepSignal);
+              if (!this.agent.experimentalFlags.enabled('sky_mode')) {
+                this.agent.microCompaction.detect();
+                await this.agent.fullCompaction.beforeStep(stepSignal);
+              }
               await this.agent.injection.inject();
               deduper.beginStep();
               return;
             },
             afterStep: async ({ usage }) => {
               this.agent.usage.record(model, usage, 'turn');
+              this.agent.context.parseAndApplySky();
               await this.agent.fullCompaction.afterStep();
               deduper.endStep();
               return stopForGoalBudget ? { stopTurn: true } : undefined;

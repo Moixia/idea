@@ -98,6 +98,8 @@ export interface AgentRecordEvents {
     actor?: GoalActor;
   };
   'goal.clear': {};
+
+  'sky.update': { content: string };
 }
 
 export type AgentRecord = {

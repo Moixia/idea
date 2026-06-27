@@ -13,6 +13,14 @@ import type { FlagDefinitionInput } from './types';
  */
 export const FLAG_DEFINITIONS = [
   {
+    id: 'sky_mode',
+    title: 'Sky mode',
+    description: 'Replace conversation history with a free-form model-managed memory string written in <sky></sky> tags.',
+    env: 'KIMI_CODE_EXPERIMENTAL_SKY_MODE',
+    default: false,
+    surface: 'core',
+  },
+  {
     id: 'micro_compaction',
     title: 'Micro compaction',
     description: 'Trim older large tool results from context while keeping recent conversation intact.',

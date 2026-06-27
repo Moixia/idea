@@ -1,4 +1,4 @@
-import { createToolMessage, type ContentPart, type Message } from '@moonshot-ai/kosong';
+import { createToolMessage, type ContentPart, type Message, type TextPart } from '@moonshot-ai/kosong';
 
 import type { Agent } from '..';
 import { ErrorCodes, KimiError } from '../../errors';
@@ -36,8 +36,68 @@ export class ContextMemory {
   private pendingToolResultIds = new Set<string>();
   private deferredMessages: ContextMessage[] = [];
   private _lastAssistantAt: number | null = null;
+  /** Sky mode: free-form string the model writes inside <sky></sky> tags. */
+  skyContent = '';
 
   constructor(protected readonly agent: Agent) {}
+
+  /** Update sky content and persist it for resume. */
+  updateSky(content: string): void {
+    this.skyContent = content;
+    this.agent.records.logRecord({ type: 'sky.update', content });
+  }
+
+  /**
+   * Parse <sky>...</sky> from the last assistant message, update skyContent,
+   * and strip the tag from the message content. No-op when sky_mode is off
+   * or no sky tag is found.
+   */
+  parseAndApplySky(): void {
+    if (!this.agent.experimentalFlags.enabled('sky_mode')) return;
+    // Find the last assistant message with text content
+    for (let i = this._history.length - 1; i >= 0; i--) {
+      const msg = this._history[i];
+      if (!msg || msg.role !== 'assistant') continue;
+      const text = msg.content
+        .filter((p): p is TextPart => p.type === 'text')
+        .map((p) => p.text)
+        .join('');
+      const start = text.indexOf('<sky>');
+      if (start === -1) break; // No sky tag, nothing to do (sky stays as-is)
+      const end = text.indexOf('</sky>', start);
+      if (end === -1) break;
+      const skyContent = text.slice(start + 6, end);
+      if (skyContent) {
+        this.updateSky(skyContent);
+      }
+      // Strip the sky tag from the message content
+      const stripped = text.slice(0, start) + text.slice(end + 7);
+      const newParts: ContentPart[] = [];
+      let remaining = stripped;
+      for (const part of msg.content) {
+        if (part.type !== 'text') {
+          newParts.push(part);
+          continue;
+        }
+        const idx = remaining.indexOf(part.text);
+        if (idx === 0) {
+          // Part is fully outside the stripped range
+          newParts.push(part);
+          remaining = remaining.slice(part.text.length);
+        } else if (idx > 0) {
+          // Part was partially inside the sky tag; emit the remaining text
+          if (remaining) {
+            newParts.push({ type: 'text', text: remaining });
+          }
+          remaining = '';
+        }
+        // idx < 0 means this part is entirely inside the stripped range, skip it
+      }
+      // Replace content with stripped version preserving the same message ref
+      (msg as { content: ContentPart[] }).content = newParts;
+      break;
+    }
+  }
 
   get lastAssistantAt(): number | null {
     return this._lastAssistantAt;
@@ -140,6 +200,7 @@ export class ContextMemory {
     this.pendingToolResultIds.clear();
     this.deferredMessages = [];
     this._lastAssistantAt = null;
+    this.skyContent = '';
     this.agent.microCompaction.reset();
     this.agent.injection.onContextClear();
     this.agent.emitStatusUpdated();
@@ -261,7 +322,51 @@ export class ContextMemory {
   }
 
   get messages(): Message[] {
+    if (this.agent.experimentalFlags.enabled('sky_mode')) {
+      return this.buildSkyMessages();
+    }
     return this.project(this.history);
+  }
+
+  /** Sky mode: only sky + current turn messages (no prior history). */
+  private buildSkyMessages(): Message[] {
+    const result: ContextMessage[] = [];
+    if (this.skyContent) {
+      result.push({
+        role: 'user',
+        content: [{ type: 'text', text: `<sky-context>\n${this.skyContent}\n</sky-context>` }],
+        toolCalls: [],
+        origin: { kind: 'injection', variant: 'sky_context' },
+      });
+    }
+    // Include everything from the last user-initiated turn onwards,
+    // so tool calls within the current turn remain visible.
+    const lastUserIdx = this._history.length - 1;
+    let turnStart = lastUserIdx;
+    for (let i = lastUserIdx; i >= 0; i--) {
+      const msg = this._history[i];
+      if (msg && msg.role === 'user' && msg.origin?.kind === 'user') {
+        turnStart = i;
+        break;
+      }
+    }
+    for (let i = turnStart; i <= lastUserIdx; i++) {
+      const msg = this._history[i];
+      if (msg) result.push({ ...msg });
+    }
+    const projected = result.map(this.stripOrigin);
+    return projected;
+  }
+
+  private stripOrigin(m: ContextMessage): Message {
+    return {
+      role: m.role,
+      name: m.name,
+      content: m.content.map((p) => ({ ...p })) as ContentPart[],
+      toolCalls: m.toolCalls.map((tc) => ({ ...tc })),
+      toolCallId: m.toolCallId,
+      partial: m.partial,
+    };
   }
 
   useProjectedHistoryFrom(source: ContextMemory): void {

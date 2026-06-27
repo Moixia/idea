@@ -77,6 +77,7 @@ export class FullCompaction {
   }
 
   begin(data: Readonly<CompactionBeginData>): void {
+    if (this.agent.experimentalFlags.enabled('sky_mode')) return;
     if (this.compacting) return;
     if (data.source === 'manual') {
       this.compactionCountInTurn = 0;
@@ -141,6 +142,7 @@ export class FullCompaction {
   }
 
   async handleOverflowError(signal: AbortSignal, error: unknown) {
+    if (this.agent.experimentalFlags.enabled('sky_mode')) throw error;
     const didStartCompaction = this.beginAutoCompaction();
     if (!didStartCompaction && !this.compacting) throw error;
     // Always block on overflow errors

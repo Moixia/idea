@@ -115,6 +115,7 @@ export class KosongLLM implements LLM {
       requestLogFields: params.requestLogFields,
     };
 
+
     const result = await this.generate(
       effectiveProvider,
       this.systemPrompt,

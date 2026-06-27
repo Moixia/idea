@@ -129,6 +129,9 @@ function restoreAgentRecord(agent: Agent, input: AgentRecord): void {
     case 'goal.clear':
       agent.goal.restoreClear(input);
       return;
+    case 'sky.update':
+      agent.context.skyContent = input.content;
+      return;
   }
 }
 
