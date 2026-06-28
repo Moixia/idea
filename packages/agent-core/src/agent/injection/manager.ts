@@ -4,6 +4,7 @@ import type { DynamicInjector } from './injector';
 import { PermissionModeInjector } from './permission-mode';
 import { PluginSessionStartInjector } from './plugin-session-start';
 import { PlanModeInjector } from './plan-mode';
+import { SkyReminderInjector } from './sky-reminder';
 import { TodoListReminderInjector } from './todo-list';
 
 export class InjectionManager {
@@ -17,6 +18,7 @@ export class InjectionManager {
 
   constructor(protected readonly agent: Agent) {
     this.injectors = [
+      new SkyReminderInjector(agent),
       new PluginSessionStartInjector(agent),
       new TodoListReminderInjector(agent),
       new PlanModeInjector(agent),

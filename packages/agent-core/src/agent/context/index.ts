@@ -331,14 +331,17 @@ export class ContextMemory {
   /** Sky mode: only sky + current turn messages (no prior history). */
   private buildSkyMessages(): Message[] {
     const result: ContextMessage[] = [];
-    if (this.skyContent) {
-      result.push({
-        role: 'user',
-        content: [{ type: 'text', text: `<sky-context>\n${this.skyContent}\n</sky-context>` }],
-        toolCalls: [],
-        origin: { kind: 'injection', variant: 'sky_context' },
-      });
-    }
+    // Always inject sky-context even when empty — gives the LLM a visual
+    // signal that Sky mode exists and that every response needs <sky>.
+    result.push({
+      role: 'user',
+      content: [{ type: 'text', text: this.skyContent
+        ? `<sky-context>\n${this.skyContent}\n</sky-context>`
+        : '<sky-context></sky-context>',
+      }],
+      toolCalls: [],
+      origin: { kind: 'injection', variant: 'sky_context' },
+    });
     // Include everything from the last user-initiated turn onwards,
     // so tool calls within the current turn remain visible.
     const lastUserIdx = this._history.length - 1;

@@ -8,7 +8,7 @@
  *  2. Wrap media-only outputs in `<mcp_tool_result name="…">` tags so the
  *     model can attribute binary output when several tools return media.
  *     Mirrors the in-tree `ReadMediaFile` convention.
- *  3. Apply size limits: text/think share a 100K character budget; binary
+ *  3. Apply size limits: text/think share a 512K character budget; binary
  *     parts (image/audio/video URLs) each carry an independent 10 MB cap and
  *     collapse to a notice when oversize, so a single screenshot cannot
  *     evict every text part.
@@ -27,7 +27,7 @@ import type { MCPContentBlock, MCPToolResult } from './types';
 // the model so a single chatty server does not blow up the context window. The
 // notice text is fed to the model verbatim so it can react (e.g. paginate),
 // which is why the limits live in the agent layer rather than in kosong.
-export const MCP_MAX_OUTPUT_CHARS = 100_000;
+export const MCP_MAX_OUTPUT_CHARS = 512_000;
 const MCP_OUTPUT_TRUNCATED_TEXT = `\n\n[Output truncated: exceeded ${String(
   MCP_MAX_OUTPUT_CHARS,
 )} character limit. Use pagination or more specific queries to get remaining content.]`;
@@ -169,11 +169,11 @@ function wrapMediaOnly(parts: readonly ContentPart[], qualifiedToolName: string)
 }
 
 /**
- * Apply the 100K text/think budget and the per-part 10 MB binary cap.
+ * Apply the 512K text/think budget and the per-part 10 MB binary cap.
  *
- * When text/think parts get truncated, the truncation notice is appended to
- * the last surviving text part — this keeps the single-text-part collapse
- * working when the entire (oversized) input is a single text block.
+ * When text/think parts get truncated, the truncation notice is prepended to
+ * the first surviving text part — this keeps the single-text-part collapse
+ * working while ensuring the model sees the pagination hint before the data.
  */
 function applyOutputLimits(parts: readonly ContentPart[]): {
   readonly parts: ContentPart[];
@@ -242,23 +242,23 @@ function applyOutputLimits(parts: readonly ContentPart[]): {
   }
 
   if (textTruncated) {
-    appendTruncationNotice(out);
+    prependTruncationNotice(out);
   }
   return { parts: out, truncated };
 }
 
-function appendTruncationNotice(out: ContentPart[]): void {
-  // Merge the notice into the last text part so the very common
-  // "single oversized text" case still collapses to a plain string. Falls
-  // back to a standalone notice part if there is no text part to merge with.
-  for (let i = out.length - 1; i >= 0; i--) {
+function prependTruncationNotice(out: ContentPart[]): void {
+  // Merge the notice into the first surviving text part so the model sees the
+  // pagination hint before the data. Falls back to a standalone notice part if
+  // there is no text part to merge with.
+  for (let i = 0; i < out.length; i++) {
     const candidate = out[i];
     if (candidate?.type === 'text') {
-      out[i] = { type: 'text', text: candidate.text + MCP_OUTPUT_TRUNCATED_TEXT };
+      out[i] = { type: 'text', text: MCP_OUTPUT_TRUNCATED_TEXT + '\n\n' + candidate.text };
       return;
     }
   }
-  out.push({ type: 'text', text: MCP_OUTPUT_TRUNCATED_TEXT });
+  out.unshift({ type: 'text', text: MCP_OUTPUT_TRUNCATED_TEXT });
 }
 
 function collapseSingleText(parts: readonly ContentPart[]): string | ContentPart[] {
