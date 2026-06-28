@@ -44,9 +44,9 @@ describe('ToolCallComponent', () => {
     );
 
     const out = strip(component.render(100).join('\n'));
-    expect(out).toContain(`${STATUS_BULLET}Used Read`);
-    expect(out).not.toContain(`\u23FA Used Read`);
-    expect(out).not.toContain(`${String.fromCodePoint(0x23fa, 0xfe0e)} Used Read`);
+    expect(out).toContain(`${STATUS_BULLET}Read`);
+    expect(out).not.toContain(`\u23FA Read`);
+    expect(out).not.toContain(`${String.fromCodePoint(0x23fa, 0xfe0e)} Read`);
   });
 
   describe('detach hint for long-running foreground Bash/Agent', () => {
@@ -147,8 +147,8 @@ describe('ToolCallComponent', () => {
     const component = new ToolCallComponent(
       {
         id: 'call_shell',
-        name: 'Bash',
-        args: { command: 'printf output' },
+        name: 'UnknownTool',
+        args: {},
       },
       {
         tool_call_id: 'call_shell',
@@ -209,8 +209,9 @@ describe('ToolCallComponent', () => {
     });
 
     const out = strip(component.render(100).join('\n'));
-    expect(out).toContain('Used Bash');
-    expect(out).toContain('final-only');
+    expect(out).toContain('Bash');
+    // Quiet tools hide the body: final-only not shown, streamed-only was already cleared.
+    expect(out).not.toContain('final-only');
     expect(out).not.toContain('streamed-only');
   });
 
@@ -253,7 +254,7 @@ describe('ToolCallComponent', () => {
       // hides the command — so the in-flight buildCallPreview preview must be
       // gone, otherwise the command would render twice when expanded.
       const out = strip(component.render(100).join('\n'));
-      expect(out).toContain('Used Bash');
+      expect(out).toContain('Bash');
       expect(out).not.toContain('$ echo step1');
     });
   });
@@ -264,8 +265,8 @@ describe('ToolCallComponent', () => {
     const component = new ToolCallComponent(
       {
         id: 'call_hidden',
-        name: 'Bash',
-        args: { command: 'echo hi' },
+        name: 'UnknownTool',
+        args: {},
       },
       {
         tool_call_id: 'call_hidden',
@@ -275,7 +276,7 @@ describe('ToolCallComponent', () => {
     );
 
     const collapsed = strip(component.render(100).join('\n'));
-    expect(collapsed).toContain(`${STATUS_BULLET}Used Bash`);
+    expect(collapsed).toContain('UnknownTool');
     expect(collapsed).not.toContain('system-reminder');
     expect(collapsed).not.toContain('task tools');
 
@@ -361,8 +362,8 @@ describe('ToolCallComponent', () => {
     const component = new ToolCallComponent(
       {
         id: 'call_inline',
-        name: 'Bash',
-        args: { command: 'echo hi' },
+        name: 'UnknownTool',
+        args: {},
       },
       {
         tool_call_id: 'call_inline',
@@ -816,8 +817,9 @@ describe('ToolCallComponent', () => {
     );
 
     const out = strip(component.render(100).join('\n'));
-    expect(out).toContain('Used Read');
-    expect(out).toContain('· 3 lines');
+    // Quiet tools (Read, Glob, Grep, MCP) no longer show "Used" or a chip.
+    expect(out).not.toContain('Used');
+    expect(out).not.toContain('· 3 lines');
   });
 
   it('truncates a long file path from the head so the filename stays visible', () => {
@@ -857,7 +859,7 @@ describe('ToolCallComponent', () => {
     const out = strip(component.render(100).join('\n'));
     const expectedReadPath =
       process.platform === 'win32' ? 'apps\\kimi-code\\src\\main.ts' : 'apps/kimi-code/src/main.ts';
-    expect(out).toContain(`Used Read (${expectedReadPath})`);
+    expect(out).toContain(`Read (${expectedReadPath})`);
     expect(out).not.toContain('/tmp/proj-a/apps');
     expect(component.getReadSnapshot().filePath).toBe(expectedReadPath);
   });
@@ -1031,9 +1033,9 @@ describe('ToolCallComponent', () => {
     const out = strip(component.render(120).join('\n'));
     expect(out).toContain('Explore Agent Running (inspect tools) · 5 tools · 0s');
     expect(out).not.toContain('file1.ts');
-    expect(out).toContain('Used Read (file2.ts)');
-    expect(out).toContain('Used Read (file3.ts)');
-    expect(out).toContain('Used Read (file4.ts)');
+    expect(out).toContain('Read (file2.ts)');
+    expect(out).toContain('Read (file3.ts)');
+    expect(out).toContain('Read (file4.ts)');
     expect(out).not.toContain('… Using Grep (auth)');
     expect(out).toContain('• Using Grep (auth)');
     expect(out).toContain('Using Grep (auth)');
@@ -1222,7 +1224,7 @@ describe('ToolCallComponent', () => {
 
     const out = strip(component.render(120).join('\n'));
     // Recognized tool: activity row only, no output body.
-    expect(out).toContain('Used Read (foo.ts)');
+    expect(out).toContain('Read (foo.ts)');
     expect(out).not.toContain('recognized-read-body');
     // Unknown/MCP tool: truncated output body, no ctrl+o promise.
     expect(out).toContain('mcp-line-0');

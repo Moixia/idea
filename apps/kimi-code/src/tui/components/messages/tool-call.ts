@@ -1441,7 +1441,8 @@ export class ToolCallComponent extends Container {
       return this.buildSingleSubagentHeader();
     }
 
-    const verb = isFinished ? 'Used' : isTruncated ? 'Truncated' : 'Using';
+    const isQuiet = isFinished && this.isQuietTool();
+    const verb = isQuiet ? '' : isFinished ? 'Used' : isTruncated ? 'Truncated' : 'Using';
     const keyArg = extractKeyArgument(toolCall.name, toolCall.args, this.workspaceDir);
     const decoded = decodeMcpToolName(toolCall.name);
     const verbStyled = isTruncated
@@ -1453,8 +1454,20 @@ export class ToolCallComponent extends Container {
         : currentTheme.boldFg('primary', toolCall.name);
     const argStr = keyArg ? currentTheme.dim(` (${keyArg})`) : '';
     let chipStr = '';
-    if (isFinished && result) chipStr = this.buildHeaderChip(result);
-    return `${bullet}${verbStyled} ${toolLabel}${argStr}${chipStr}`;
+    if (isFinished && result && !isQuiet) chipStr = this.buildHeaderChip(result);
+    const verbPrefix = verbStyled ? `${verbStyled} ` : '';
+    return `${bullet}${verbPrefix}${toolLabel}${argStr}${chipStr}`;
+  }
+
+  private isQuietTool(): boolean {
+    const name = this.toolCall.name;
+    return (
+      name === 'Read' ||
+      name === 'Glob' ||
+      name === 'Grep' ||
+      name === 'Bash' ||
+      decodeMcpToolName(name) !== null
+    );
   }
 
   private buildHeaderChip(result: ToolResultBlockData): string {
@@ -2083,6 +2096,12 @@ export class ToolCallComponent extends Container {
     }
 
     if (this.toolCall.name === 'EnterPlanMode' && !result.is_error) {
+      return;
+    }
+
+    // Read, Glob, Grep, and MCP tools: the model receives the full result,
+    // but the TUI hides it to keep the transcript clean.
+    if (this.isQuietTool()) {
       return;
     }
 
