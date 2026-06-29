@@ -46,7 +46,7 @@ import * as slashCommands from './commands/dispatch';
 import { BannerComponent } from './components/chrome/banner';
 import { DeviceCodeBoxComponent } from './components/chrome/device-code-box';
 import { GutterContainer } from './components/chrome/gutter-container';
-import { MoonLoader, type SpinnerStyle } from './components/chrome/moon-loader';
+import { MoonLoader } from './components/chrome/moon-loader';
 import { WelcomeComponent } from './components/chrome/welcome';
 import { pickRandomWorkingTip } from './components/chrome/working-tips';
 import {
@@ -1708,6 +1708,7 @@ export class KimiTUI {
             entry.toolCallData.result,
             this.state.ui,
             this.state.appState.workDir,
+            this.state.verboseMode,
           );
           if (this.state.toolOutputExpanded) tc.setExpanded(true);
           return tc;
@@ -2243,6 +2244,26 @@ export class KimiTUI {
     this.state.ui.requestRender();
   }
 
+  toggleVerboseMode(): void {
+    this.state.verboseMode = !this.state.verboseMode;
+    const label = this.state.verboseMode ? 'Verbose mode on' : 'Verbose mode off';
+    this.state.footer.setTransientHint(label);
+    setTimeout(() => {
+      if (this.state.footer.getTransientHint() === label) {
+        this.state.footer.setTransientHint(null);
+        this.state.ui.requestRender();
+      }
+    }, 4_000);
+    const children = this.state.transcriptContainer.children;
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i]!;
+      if (child instanceof ToolCallComponent) {
+        child.setVerboseMode(this.state.verboseMode);
+      }
+    }
+    this.state.ui.requestRender();
+  }
+
   private async detachRunningShellCommand(): Promise<void> {
     // Only one `!` command runs at a time (input is queued while busy).
     const next = this.shellOutputStreams.entries().next();
@@ -2429,7 +2450,7 @@ export class KimiTUI {
   }
 
   private ensureActivitySpinner(
-    style: SpinnerStyle,
+    style: string,
     label = '',
     colorFn?: (s: string) => string,
   ): MoonLoader {

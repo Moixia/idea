@@ -1,13 +1,12 @@
 /**
  * Welcome panel shown at the top of the TUI.
- * Renders a round-bordered box with the logo, session, model, and version.
+ * Renders a single clean line with version, model, and MCP summary.
  */
 
 import type { Component } from '@earendil-works/pi-tui';
-import { truncateToWidth, visibleWidth } from '@earendil-works/pi-tui';
+import { truncateToWidth } from '@earendil-works/pi-tui';
 import chalk from 'chalk';
 
-import { isRainbowDancing, renderDanceWelcomeHeader } from '#/tui/easter-eggs/dance';
 import type { AppState } from '#/tui/types';
 import { currentTheme } from '#/tui/theme';
 
@@ -22,87 +21,22 @@ export class WelcomeComponent implements Component {
 
   render(width: number): string[] {
     const safeWidth = Math.max(0, width);
-    const primary = (s: string): string => chalk.hex(currentTheme.palette.primary)(s);
-    const isLoggedOut = !this.state.model;
-    const activeModel = this.state.availableModels[this.state.model];
-
-    if (safeWidth < 24) {
-      const title = chalk.bold.hex(currentTheme.palette.primary)('Welcome to Landa!');
-      const prompt = isLoggedOut
-        ? chalk.hex(currentTheme.palette.warning)('Run /login or /provider to get started.')
-        : chalk.hex(currentTheme.palette.textDim)('Send /help for help information.');
-      const model = isLoggedOut
-        ? chalk.hex(currentTheme.palette.warning)('not set, run /login or /provider')
-        : (activeModel?.displayName ?? activeModel?.model ?? this.state.model);
-      return ['', title, prompt, `Model: ${model}`].map((line) =>
-        truncateToWidth(line, safeWidth, '…'),
-      );
-    }
-
-    const innerWidth = Math.max(1, safeWidth - 4);
-    const pad = '  ';
-
-    // Logo + side-by-side text.
-    const logo = ['▐█▛█▛█▌', '▐█████▌'] as const;
-    const logoWidth = Math.max(...logo.map((row) => visibleWidth(row)));
-    const gap = '  ';
-    const textWidth = Math.max(4, innerWidth - logoWidth - gap.length);
-
-    const rightRow0 = truncateToWidth(
-      chalk.bold.hex(currentTheme.palette.primary)('Welcome to Landa!'),
-      textWidth,
-      '…',
-    );
     const dim = chalk.hex(currentTheme.palette.textDim);
-    const labelStyle = chalk.bold.hex(currentTheme.palette.textDim);
-    const rightRow1 = truncateToWidth(
-      dim(isLoggedOut ? 'Run /login or /provider to get started.' : 'Send /help for help information.'),
-      textWidth,
-      '…',
-    );
+    const primary = chalk.hex(currentTheme.palette.primary);
 
-    let renderedHeaderLines = [
-      primary(logo[0].padEnd(logoWidth)) + gap + rightRow0,
-      primary(logo[1].padEnd(logoWidth)) + gap + rightRow1,
-    ];
-    if (isRainbowDancing()) {
-      renderedHeaderLines = renderDanceWelcomeHeader(logo, textWidth, rightRow1);
-    }
+    const activeModel = this.state.availableModels[this.state.model];
+    const modelValue = activeModel?.displayName ?? activeModel?.model ?? this.state.model;
 
-    const modelValue = isLoggedOut
-      ? chalk.hex(currentTheme.palette.warning)('not set, run /login or /provider')
-      : (activeModel?.displayName ?? activeModel?.model ?? this.state.model);
-
-    const infoLines = [
-      labelStyle('Directory: ') + this.state.workDir,
-      labelStyle('Session:   ') + this.state.sessionId,
-      labelStyle('Model:     ') + modelValue,
-      labelStyle('Version:   ') + this.state.version,
+    const parts: string[] = [
+      `Landa ${this.state.version}`,
+      modelValue,
     ];
 
     if (this.state.mcpServersSummary) {
-      infoLines.push(labelStyle('MCP:       ') + this.state.mcpServersSummary);
+      parts.push(this.state.mcpServersSummary);
     }
 
-    const contentLines: string[] = [...renderedHeaderLines, '', ...infoLines];
-
-    const lines: string[] = [
-      '',
-      primary('╭' + '─'.repeat(safeWidth - 2) + '╮'),
-      primary('│') + ' '.repeat(safeWidth - 2) + primary('│'),
-    ];
-
-    for (const content of contentLines) {
-      const truncated = truncateToWidth(content, innerWidth, '…');
-      const vis = visibleWidth(truncated);
-      const rightPad = Math.max(0, innerWidth - vis);
-      lines.push(primary('│') + pad + truncated + ' '.repeat(rightPad) + primary('│'));
-    }
-
-    lines.push(primary('│') + ' '.repeat(safeWidth - 2) + primary('│'));
-    lines.push(primary('╰' + '─'.repeat(safeWidth - 2) + '╯'));
-    lines.push('');
-
-    return lines.map((line) => truncateToWidth(line, safeWidth, '…'));
+    const line = `  ${parts.join(dim(' · '))}`;
+    return ['', truncateToWidth(line, safeWidth, '…')];
   }
 }

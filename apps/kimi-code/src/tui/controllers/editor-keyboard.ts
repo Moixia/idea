@@ -31,6 +31,7 @@ export interface EditorKeyboardHost {
   updateEditorBorderHighlight(text?: string): void;
   updateQueueDisplay(): void;
   toggleToolOutputExpansion(): void;
+  toggleVerboseMode(): void;
   toggleTodoPanelExpansion(): void;
   detachCurrentForegroundTask(): void;
   cancelRunningShellCommand(): void;
@@ -161,6 +162,11 @@ export class EditorKeyboardController {
     editor.onToggleToolExpand = () => {
       host.track('shortcut_expand');
       host.toggleToolOutputExpansion();
+    };
+
+    editor.onToggleVerboseMode = () => {
+      host.track('shortcut_verbose');
+      host.toggleVerboseMode();
     };
 
     editor.onToggleTodoExpand = (): boolean => {

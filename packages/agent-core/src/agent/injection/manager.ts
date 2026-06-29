@@ -20,8 +20,8 @@ export class InjectionManager {
     this.injectors = [
       new SkyReminderInjector(agent),
       new PluginSessionStartInjector(agent),
-      new TodoListReminderInjector(agent),
-      new PlanModeInjector(agent),
+      // new TodoListReminderInjector(agent),
+      // new PlanModeInjector(agent),
       new PermissionModeInjector(agent),
     ];
     this.goalInjector = agent.type === 'main' ? new GoalInjector(agent) : null;

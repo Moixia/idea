@@ -27,7 +27,7 @@ import type { MCPContentBlock, MCPToolResult } from './types';
 // the model so a single chatty server does not blow up the context window. The
 // notice text is fed to the model verbatim so it can react (e.g. paginate),
 // which is why the limits live in the agent layer rather than in kosong.
-export const MCP_MAX_OUTPUT_CHARS = 512_000;
+export const MCP_MAX_OUTPUT_CHARS = Infinity;
 const MCP_OUTPUT_TRUNCATED_TEXT = `\n\n[Output truncated: exceeded ${String(
   MCP_MAX_OUTPUT_CHARS,
 )} character limit. Use pagination or more specific queries to get remaining content.]`;

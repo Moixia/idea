@@ -10,6 +10,7 @@ import type { Component, TUI } from '@earendil-works/pi-tui';
 import { highlightLines, langFromPath } from '#/tui/components/media/code-highlight';
 import { renderDiffLinesClustered } from '#/tui/components/media/diff-preview';
 import {
+  BRAILLE_SPINNER_FRAMES,
   COMMAND_PREVIEW_LINES,
   RESULT_PREVIEW_LINES,
   THINKING_PREVIEW_LINES,
@@ -46,6 +47,7 @@ const SUBAGENT_ELAPSED_INTERVAL_MS = 1000;
 const PROGRESS_URL_RE = /https?:\/\/\S+/g;
 const ABORTED_MARK = '⊘';
 const MAX_LIVE_OUTPUT_CHARS = 50_000;
+const SPINNER_INTERVAL_MS = 80;
 
 /** Delay before a long-running foreground Bash/Agent card advertises Ctrl+B. */
 const DETACH_HINT_DELAY_MS = 10_000;
@@ -577,6 +579,9 @@ export class ToolCallComponent extends Container {
   private subagentElapsedTimer: ReturnType<typeof setInterval> | undefined;
   private subagentStartedAtMs: number | undefined;
   private subagentEndedAtMs: number | undefined;
+  private verboseMode = false;
+  private spinnerFrame = 0;
+  private spinnerTimer: ReturnType<typeof setInterval> | undefined;
 
   // ── Live progress lines ──────────────────────────────────────────
   //
@@ -612,11 +617,13 @@ export class ToolCallComponent extends Container {
     result: ToolResultBlockData | undefined,
     ui?: TUI,
     private readonly workspaceDir?: string,
+    verboseMode?: boolean,
   ) {
     super();
     this.toolCall = toolCall;
     this.result = result;
     this.ui = ui;
+    this.verboseMode = verboseMode ?? false;
     this.applySubagentReplay(toolCall.subagent);
 
     this.addChild(new Spacer(1));
@@ -631,6 +638,7 @@ export class ToolCallComponent extends Container {
     this.syncStreamingProgressTimer();
     this.syncSubagentElapsedTimer();
     this.startDetachHintTimer();
+    this.startSpinnerTimer();
   }
 
   private renderCache:
@@ -638,6 +646,12 @@ export class ToolCallComponent extends Container {
     | undefined;
 
   override render(width: number): string[] {
+    // In minimal mode with no result, only show the spinner header.
+    // When the tool finishes, render nothing so the component collapses.
+    if (!this.verboseMode && this.result !== undefined) {
+      return [];
+    }
+
     const cache = this.renderCache;
     const cacheValid =
       isRenderCacheEnabled() &&
@@ -701,6 +715,7 @@ export class ToolCallComponent extends Container {
     this.liveOutput = '';
     this.detachHintVisible = false;
     this.stopDetachHintTimer();
+    this.stopSpinnerTimer();
     this.finalizeSubagentElapsedIfNeeded();
     this.syncStreamingProgressTimer();
     this.syncSubagentElapsedTimer();
@@ -760,6 +775,7 @@ export class ToolCallComponent extends Container {
     this.stopStreamingProgressTimer();
     this.stopSubagentElapsedTimer();
     this.stopDetachHintTimer();
+    this.stopSpinnerTimer();
   }
 
   /**
@@ -1057,6 +1073,36 @@ export class ToolCallComponent extends Container {
     ) {
       this.subagentEndedAtMs = Date.now();
     }
+  }
+
+  setVerboseMode(v: boolean): void {
+    if (this.verboseMode === v) return;
+    this.verboseMode = v;
+    this.renderCache = undefined;
+    if (v) {
+      this.stopSpinnerTimer();
+    } else {
+      this.startSpinnerTimer();
+    }
+    this.headerText.setText(this.buildHeader());
+    this.rebuildBody();
+  }
+
+  private startSpinnerTimer(): void {
+    if (this.result !== undefined) return;
+    if (this.ui === undefined || this.spinnerTimer !== undefined) return;
+    this.spinnerTimer = setInterval(() => {
+      this.spinnerFrame = (this.spinnerFrame + 1) % BRAILLE_SPINNER_FRAMES.length;
+      this.headerText.setText(this.buildHeader());
+      this.invalidate();
+      this.ui?.requestRender();
+    }, SPINNER_INTERVAL_MS);
+  }
+
+  private stopSpinnerTimer(): void {
+    if (this.spinnerTimer === undefined) return;
+    clearInterval(this.spinnerTimer);
+    this.spinnerTimer = undefined;
   }
 
   /**
@@ -1382,8 +1428,18 @@ export class ToolCallComponent extends Container {
   }
 
   private buildHeader(): string {
-    const { toolCall, result } = this;
+    const { toolCall, result, verboseMode } = this;
     const isFinished = result !== undefined;
+
+    // In minimal mode (verboseMode off), show only a spinner while the tool
+    // is executing, and nothing when finished.
+    if (!verboseMode) {
+      if (isFinished) return '';
+      const frame = BRAILLE_SPINNER_FRAMES[this.spinnerFrame] ?? BRAILLE_SPINNER_FRAMES[0]!;
+      return `${currentTheme.fg('text', STATUS_BULLET)}${frame}`;
+    }
+
+    // ── Verbose mode — original rendering below ──────────────────────
     const isError = result?.is_error ?? false;
     const isTruncated = toolCall.truncated === true && !isFinished;
 
@@ -1483,6 +1539,7 @@ export class ToolCallComponent extends Container {
     while (this.children.length > this.callPreviewEndIndex) {
       this.children.pop();
     }
+    if (!this.verboseMode) return;
     this.buildProgressBlock();
     this.buildDetachHintBlock();
     this.buildLiveOutputBlock();
@@ -1493,6 +1550,11 @@ export class ToolCallComponent extends Container {
   private rebuildBody(): void {
     while (this.children.length > 2) {
       this.children.pop();
+    }
+    if (!this.verboseMode) {
+      // In minimal mode only the header spinner is shown; no preview, no progress, no result.
+      this.callPreviewEndIndex = this.children.length;
+      return;
     }
     this.buildCallPreview();
     this.callPreviewEndIndex = this.children.length;
@@ -1860,6 +1922,7 @@ export class ToolCallComponent extends Container {
   }
 
   private buildCallPreview(): void {
+    if (!this.verboseMode) return;
     const name = this.toolCall.name;
     if (name === 'ExitPlanMode') {
       this.buildPlanPreview();
@@ -2049,8 +2112,11 @@ export class ToolCallComponent extends Container {
   }
 
   private buildContent(): void {
-    const { result } = this;
+    const { result, verboseMode } = this;
     if (result === undefined) return;
+
+    // In minimal mode, suppress all tool result content.
+    if (!verboseMode) return;
 
     if (this.toolCall.name === 'AgentSwarm') {
       this.buildAgentSwarmResultSummary(result);

@@ -120,6 +120,7 @@ export class CustomEditor extends Editor {
   public onCtrlD?: () => void;
   public onCtrlC?: () => void;
   public onToggleToolExpand?: () => void;
+  public onToggleVerboseMode?: () => void;
   public onOpenExternalEditor?: () => void;
   public onCtrlS?: () => void;
   /** Return `true` to consume Ctrl+B; return `false`/`undefined` to fall through to the editor default (cursor-left). */
@@ -377,6 +378,11 @@ export class CustomEditor extends Editor {
       // Only consume the key when the todo list actually has overflow to
       // expand/collapse; otherwise fall through to the editor default.
       if (this.onToggleTodoExpand?.() === true) return;
+    }
+
+    if (matchesKey(normalized, Key.ctrl('w'))) {
+      this.onToggleVerboseMode?.();
+      return;
     }
 
     if (matchesKey(normalized, 'shift+tab')) {
