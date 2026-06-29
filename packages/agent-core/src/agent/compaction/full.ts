@@ -406,7 +406,7 @@ export class FullCompaction {
       this.agent.telemetry.track('compaction_finished', {
         tokensBefore: result.tokensBefore,
         tokensAfter: result.tokensAfter,
-        duration: Date.now() - startedAt,
+        duration_ms: Date.now() - startedAt,
         compactedCount: result.compactedCount,
         retryCount,
         round,
@@ -421,7 +421,7 @@ export class FullCompaction {
       this.agent.telemetry.track('compaction_failed', {
         ...data,
         tokensBefore,
-        duration: Date.now() - startedAt,
+        duration_ms: Date.now() - startedAt,
         round,
         retryCount,
         thinkingLevel: this.agent.config.thinkingLevel,
