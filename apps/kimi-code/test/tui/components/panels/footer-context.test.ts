@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import chalk from 'chalk';
 
-import { FooterComponent, formatFooterGitBadge, buildWeightedTips } from '#/tui/components/chrome/footer';
+import { buildWeightedTips } from '#/tui/components/chrome/working-tips';
+import { FooterComponent, formatFooterGitBadge } from '#/tui/components/chrome/footer';
 import { darkColors } from '#/tui/theme/colors';
 import type { AppState } from '#/tui/types';
 

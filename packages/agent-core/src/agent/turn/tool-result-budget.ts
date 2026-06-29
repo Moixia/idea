@@ -19,6 +19,12 @@ interface BudgetToolResultOptions {
 export async function budgetToolResultForModel(
   options: BudgetToolResultOptions,
 ): Promise<ExecutableToolResult> {
+  // MCP tools handle their own output limits in the agent-to-model pipeline
+  // via mcpResultToExecutableOutput; skip the generic tool-result budget so
+  // large MCP outputs (e.g. detect_changes, get_architecture) reach the model
+  // without being replaced by a preview-and-file-path.
+  if (options.toolName.startsWith('mcp__')) return options.result;
+
   const text = persistableToolResultText(options.result.output);
   if (text === undefined || text.length <= TOOL_RESULT_MAX_CHARS) return options.result;
   if (options.homedir === undefined) return options.result;

@@ -280,8 +280,7 @@ export class KimiTUI {
   readonly tasksBrowserController: TasksBrowserController;
   readonly editorKeyboard: EditorKeyboardController;
 
-  /** Timer that auto-clears the one-shot "moved to background" footer hint. */
-  private detachHintClearTimer: ReturnType<typeof setTimeout> | undefined;
+
 
   // The currently-mounted approval panel, if any. Kept so the full-screen
   // preview viewer can restore focus to the exact same instance (and its
@@ -2246,14 +2245,6 @@ export class KimiTUI {
 
   toggleVerboseMode(): void {
     this.state.verboseMode = !this.state.verboseMode;
-    const label = this.state.verboseMode ? 'Verbose mode on' : 'Verbose mode off';
-    this.state.footer.setTransientHint(label);
-    setTimeout(() => {
-      if (this.state.footer.getTransientHint() === label) {
-        this.state.footer.setTransientHint(null);
-        this.state.ui.requestRender();
-      }
-    }, 4_000);
     const children = this.state.transcriptContainer.children;
     for (let i = 0; i < children.length; i++) {
       const child = children[i]!;
@@ -2268,12 +2259,10 @@ export class KimiTUI {
     // Only one `!` command runs at a time (input is queued while busy).
     const next = this.shellOutputStreams.entries().next();
     if (next.done) {
-      this.showDetachHint('No shell command running.');
       return;
     }
     const [commandId, stream] = next.value;
     if (stream.taskId === undefined) {
-      this.showDetachHint('Command is still starting — try again.');
       return;
     }
     const session = this.session;
@@ -2281,7 +2270,6 @@ export class KimiTUI {
     try {
       const info = await session.detachBackgroundTask(stream.taskId);
       if (info === undefined) {
-        this.showDetachHint('Command already finished.');
         return;
       }
     } catch (error) {
@@ -2294,10 +2282,6 @@ export class KimiTUI {
     stream.component.finishBackgrounded();
     stream.entry.content = 'Moved to background.';
     this.shellOutputStreams.delete(commandId);
-    // The backgrounded command's notification turn (started by agent-core via
-    // appendSystemReminderAndNotify) owns the streaming phase and drains the
-    // queue when it completes, so we intentionally leave both untouched here.
-    this.showDetachHint('Moved to background. /tasks to view.');
   }
 
   async detachCurrentForegroundTask(): Promise<void> {
@@ -2325,7 +2309,6 @@ export class KimiTUI {
 
     const targets = pickForegroundTasks(tasks);
     if (targets.length === 0) {
-      this.showDetachHint('No foreground task running.');
       return;
     }
 
@@ -2340,35 +2323,6 @@ export class KimiTUI {
         this.showError(`Failed to detach ${target.taskId}: ${formatErrorMessage(error)}`);
       }
     }
-
-    let hint: string;
-    if (detached === 0 && alreadyFinished > 0) {
-      hint = alreadyFinished === 1 ? 'Task already finished.' : 'Tasks already finished.';
-    } else if (detached === targets.length) {
-      hint = detached === 1 ? 'Moved 1 task to background.' : `Moved ${detached} tasks to background.`;
-    } else {
-      hint = `Moved ${detached} of ${targets.length} tasks to background.`;
-    }
-    if (detached > 0) hint = `${hint} /tasks to view.`;
-    this.showDetachHint(hint);
-  }
-
-  /** Show a one-shot footer hint that auto-clears after DETACH_HINT_DISPLAY_MS. */
-  private showDetachHint(hint: string): void {
-    if (this.detachHintClearTimer !== undefined) {
-      clearTimeout(this.detachHintClearTimer);
-      this.detachHintClearTimer = undefined;
-    }
-    this.state.footer.setTransientHint(hint);
-    this.detachHintClearTimer = setTimeout(() => {
-      this.detachHintClearTimer = undefined;
-      // Don't clobber a newer transient hint (e.g. the exit-confirmation
-      // prompt) that took over while this timer was pending.
-      if (this.state.footer.getTransientHint() !== hint) return;
-      this.state.footer.setTransientHint(null);
-      this.state.ui.requestRender();
-    }, DETACH_HINT_DISPLAY_MS);
-    this.state.ui.requestRender();
   }
 
   updateEditorBorderHighlight(text?: string): void {

@@ -4,6 +4,7 @@ import picomatch from 'picomatch';
 
 import type { Agent } from '..';
 import { makeErrorPayload } from '../../errors';
+import { ToolAccesses } from '../../loop';
 import type { ExecutableTool, ToolUpdate } from '../../loop';
 import { createMcpAuthTool } from '../../mcp/auth-tool';
 import type { McpConnectionManager, McpServerEntry } from '../../mcp';
@@ -271,6 +272,7 @@ export class ToolManager {
         parameters: tool.parameters,
         resolveExecution: (args) => {
           return {
+            accesses: ToolAccesses.none(),
             approvalRule: qualified,
             execute: async (context) => {
               // `args` has already been JSON-parsed and schema-validated by

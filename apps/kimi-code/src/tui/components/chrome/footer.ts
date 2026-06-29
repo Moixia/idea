@@ -1,9 +1,7 @@
 /**
- * Footer/status bar — simplified two-line status display.
+ * Footer/status bar — simplified single-line status display.
  *
- * Layout:
- *   Line 1:   {cwd}  ·  {git-branch}
- *   Line 2:   {model}  ·  {tokens}/{max} tokens
+ * Layout:   {cwd}  ·  {git}  |  {model}  ·  {tokens} / {maxTokens} tokens
  */
 
 import type { Component } from '@earendil-works/pi-tui';
@@ -82,24 +80,26 @@ export class FooterComponent implements Component {
     const dim = chalk.hex(colors.textDim);
     const text = chalk.hex(colors.text);
 
-    // Line 1: cwd  ·  git-branch
+    // Left section: cwd  ·  git-branch
     const cwd = shortenCwd(this.state.workDir);
     const git = this.gitCache.getStatus();
     const branch = git !== null ? git.branch : '';
-    const line1Parts: string[] = [];
-    if (cwd) line1Parts.push(dim(cwd));
-    if (branch) line1Parts.push(dim(branch));
-    const line1 = line1Parts.length > 0 ? `  ${line1Parts.join(dim(' · '))}` : '';
+    const leftParts: string[] = [];
+    if (cwd) leftParts.push(dim(cwd));
+    if (branch) leftParts.push(dim(branch));
+    const leftSection = leftParts.join(dim(' · '));
 
-    // Line 2: model  ·  tokens / max tokens
+    // Right section: model  ·  tokens / max tokens
     const model = modelDisplayName(this.state);
     const tokens = formatTokenCount(this.state.contextTokens);
     const maxTokens = formatTokenCount(this.state.maxContextTokens);
-    const line2 = `  ${text(model)}${dim(' · ')}${dim(tokens)}${dim(' / ')}${dim(maxTokens)}${dim(' tokens')}`;
+    const rightSection = `${text(model)}${dim(' · ')}${dim(tokens)}${dim(' / ')}${dim(maxTokens)}${dim(' tokens')}`;
 
-    return [
-      truncateToWidth(line1, safeWidth, '…'),
-      truncateToWidth(line2, safeWidth, '…'),
-    ];
+    const parts: string[] = [];
+    if (leftSection) parts.push(leftSection);
+    if (rightSection) parts.push(rightSection);
+    const line = parts.length > 0 ? `  ${parts.join(dim(' | '))}` : '';
+
+    return [truncateToWidth(line, safeWidth, '…')];
   }
 }
