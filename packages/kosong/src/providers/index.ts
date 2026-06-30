@@ -9,6 +9,7 @@ import {
 } from './capability-registry';
 import { GoogleGenAIChatProvider, type GoogleGenAIOptions } from './google-genai';
 import { KimiChatProvider, type KimiOptions } from './kimi';
+import { LocalChatProvider, type LocalOptions } from './local';
 import { OpenAILegacyChatProvider, type OpenAILegacyOptions } from './openai-legacy';
 import { OpenAIResponsesChatProvider, type OpenAIResponsesOptions } from './openai-responses';
 
@@ -18,7 +19,8 @@ export type ProviderConfig =
   | ({ type: 'kimi' } & KimiOptions)
   | ({ type: 'google-genai' } & GoogleGenAIOptions)
   | ({ type: 'openai_responses' } & OpenAIResponsesOptions)
-  | ({ type: 'vertexai' } & GoogleGenAIOptions);
+  | ({ type: 'vertexai' } & GoogleGenAIOptions)
+  | ({ type: 'local' } & LocalOptions);
 
 export type ProviderType = ProviderConfig['type'];
 
@@ -36,6 +38,8 @@ export function createProvider(config: ProviderConfig): ChatProvider {
       return new OpenAIResponsesChatProvider(config);
     case 'vertexai':
       return new GoogleGenAIChatProvider(config);
+    case 'local':
+      return new LocalChatProvider(config);
     default: {
       const exhaustive: never = config;
       throw new Error(`Unknown provider type: ${String(exhaustive)}`);
@@ -63,6 +67,7 @@ export function getModelCapability(wire: ProviderType, modelName: string): Model
     case 'vertexai':
       return getGoogleGenAIModelCapability(modelName);
     case 'kimi':
+    case 'local':
       return UNKNOWN_CAPABILITY;
     default: {
       const exhaustive: never = wire;

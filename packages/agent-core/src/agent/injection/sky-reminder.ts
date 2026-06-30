@@ -14,7 +14,9 @@ export class SkyReminderInjector extends DynamicInjector {
   protected override readonly injectionVariant = 'sky_reminder';
 
   getInjection(): string | undefined {
-    if (!this.agent.experimentalFlags.enabled('sky_mode')) return undefined;
+    // Sky mode is disabled for local provider (no system prompt context)
+    const isLocal = this.agent.config.provider.name === 'local';
+    if (isLocal || !this.agent.experimentalFlags.enabled('sky_mode')) return undefined;
     return SKY_REMINDER;
   }
 }

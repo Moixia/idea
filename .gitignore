@@ -19,6 +19,8 @@ plugins/cdn/
 
 # Lander MCP server binary — not committed, ships in the distribution zip
 apps/kimi-code/lander/
+apps/kimi-code/llama/
+apps/kimi-code/local-model/
 
 Dockerfile
 docker-compose.yml

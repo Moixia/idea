@@ -255,6 +255,21 @@ export const BUILTIN_SLASH_COMMANDS = [
     availability: 'idle-only',
   },
   {
+    name: 'enable_local',
+    aliases: [],
+    description: 'Enable local GGUF model provider',
+    priority: 60,
+    availability: 'idle-only',
+    argumentHint: '[model.gguf path]',
+  },
+  {
+    name: 'disable_local',
+    aliases: [],
+    description: 'Disable local GGUF model provider',
+    priority: 60,
+    availability: 'idle-only',
+  },
+  {
     name: 'reload',
     aliases: [],
     description: 'Reload session and apply config.toml settings plus tui.toml UI preferences',

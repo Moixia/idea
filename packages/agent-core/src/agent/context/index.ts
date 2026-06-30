@@ -322,7 +322,9 @@ export class ContextMemory {
   }
 
   get messages(): Message[] {
-    if (this.agent.experimentalFlags.enabled('sky_mode')) {
+    // Sky mode depends on system prompt for context, which is skipped for local provider
+    const isLocal = this.agent.config.provider.name === 'local';
+    if (!isLocal && this.agent.experimentalFlags.enabled('sky_mode')) {
       return this.buildSkyMessages();
     }
     return this.project(this.history);

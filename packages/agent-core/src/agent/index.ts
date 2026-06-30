@@ -245,6 +245,7 @@ export class Agent {
       generate: this.generate,
       completionBudgetConfig,
       usedContextTokens: () => this.context.tokenCount,
+      providerName: provider.name,
     });
   }
 

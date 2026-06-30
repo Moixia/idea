@@ -63,12 +63,17 @@ export interface KosongLLMConfig {
    * providers to size the completion budget to the remaining context window.
    */
   readonly usedContextTokens?: (() => number) | undefined;
+  /**
+   * Provider name for conditional behavior (e.g., skipping system prompt/tools for local).
+   */
+  readonly providerName?: string | undefined;
 }
 
 export class KosongLLM implements LLM {
   readonly systemPrompt: string;
   readonly modelName: string;
   readonly capability?: ModelCapability | undefined;
+  readonly providerName: string | undefined;
 
   private readonly provider: ChatProvider;
   private readonly generate: GenerateFn;
@@ -80,6 +85,7 @@ export class KosongLLM implements LLM {
     this.modelName = config.provider.modelName;
     this.systemPrompt = config.systemPrompt;
     this.capability = config.capability;
+    this.providerName = config.providerName;
     this.generate = config.generate ?? kosongGenerate;
     this.completionBudgetConfig = config.completionBudgetConfig;
     this.usedContextTokens = config.usedContextTokens;
@@ -117,11 +123,15 @@ export class KosongLLM implements LLM {
       requestLogFields: params.requestLogFields,
     };
 
+    // For local provider, skip system prompt and tools to avoid context overflow
+    const isLocal = this.providerName === 'local';
+    const effectiveSystemPrompt = isLocal ? '' : this.systemPrompt;
+    const effectiveTools = isLocal ? [] : [...params.tools];
 
     const result = await this.generate(
       effectiveProvider,
-      this.systemPrompt,
-      [...params.tools],
+      effectiveSystemPrompt,
+      effectiveTools,
       downgradeUnsupportedMedia(params.messages, this.capability),
       callbacks,
       options,

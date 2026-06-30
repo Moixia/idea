@@ -77,3 +77,12 @@ export {
  * `@moonshot-ai/kosong/providers/kimi`,
  * `@moonshot-ai/kosong/providers/openai-legacy`, etc.
  */
+
+// Local model process lifecycle
+export {
+  LlamaServerProcess,
+  resolveLlamaServerPath,
+  LLAMA_SERVER_DEFAULT_PORT,
+  LLAMA_SERVER_READY_TIMEOUT_MS,
+} from './local/llama-server-process.js';
+export type { LlamaServerOptions } from './local/llama-server-process.js';

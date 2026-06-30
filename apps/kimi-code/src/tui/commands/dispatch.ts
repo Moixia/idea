@@ -37,6 +37,7 @@ import {
 import { handleGoalCommand } from './goal';
 import { handleFeedbackCommand, showMcpServers, showStatusReport, showUsage } from './info';
 import { handleAddDirCommand } from './add-dir';
+import { handleDisableLocalCommand, handleEnableLocalCommand } from './local';
 import { parseSlashInput } from './parse';
 import { handlePluginsCommand } from './plugins';
 import { handleProviderCommand } from './provider';
@@ -79,6 +80,7 @@ export { handleFeedbackCommand, showMcpServers, showStatusReport, showUsage } fr
 export { handlePluginsCommand } from './plugins';
 export { handleReloadCommand, handleReloadTuiCommand } from './reload';
 export { handleGoalCommand } from './goal';
+export { handleDisableLocalCommand, handleEnableLocalCommand } from './local';
 export {
   handleExportDebugZipCommand,
   handleExportMdCommand,
@@ -260,6 +262,12 @@ async function handleBuiltInSlashCommand(
       return;
     case 'reload-tui':
       await handleReloadTuiCommand(host);
+      return;
+    case 'enable_local':
+      await handleEnableLocalCommand(host, args);
+      return;
+    case 'disable_local':
+      await handleDisableLocalCommand(host, args);
       return;
     case 'editor':
       await handleEditorCommand(host, args);

@@ -32,7 +32,6 @@ interface ProviderManagerOptions {
   readonly kimiRequestHeaders?: Record<string, string>;
   readonly resolveOAuthTokenProvider?: OAuthTokenProviderResolver;
   readonly promptCacheKey?: string;
-  // remove before commit
   readonly adaptiveThinkingOverride?: () => boolean | undefined;
 }
 
@@ -113,7 +112,6 @@ export class ProviderManager implements ModelProvider {
       );
     }
 
-    // remove before commit
     const adaptiveThinkingOverride = this.options.adaptiveThinkingOverride?.();
     const effectiveAdaptiveThinking = adaptiveThinkingOverride ?? alias.adaptiveThinking;
     const provider = toKosongProviderConfig(
@@ -341,6 +339,18 @@ function toKosongProviderConfig(
         }),
       };
     }
+    case 'local': {
+      return {
+        type: 'local',
+        modelPath: provider.modelPath ?? '',
+        baseUrl: providerValue(provider.baseUrl, provider.env, 'LLAMA_SERVER_BASE_URL'),
+        contextSize: provider.contextSize,
+        gpuLayers: provider.gpuLayers,
+        port: provider.port,
+        model,
+        apiKey: providerApiKey(provider),
+      };
+    }
     default: {
       const exhaustive: never = effectiveType;
       throw new KimiError(
@@ -390,6 +400,11 @@ function providerApiKey(provider: ProviderConfig): string | undefined {
         nonEmptyString(provider.apiKey) ??
         envValue(provider.env, 'VERTEXAI_API_KEY') ??
         envValue(provider.env, 'GOOGLE_API_KEY')
+      );
+    case 'local':
+      return (
+        nonEmptyString(provider.apiKey) ??
+        envValue(provider.env, 'LLAMA_SERVER_API_KEY')
       );
     default: {
       const exhaustive: never = provider.type;

@@ -10,6 +10,7 @@ export const ProviderTypeSchema = z.enum([
   'google-genai',
   'openai_responses',
   'vertexai',
+  'local',
 ]);
 
 export type ProviderType = z.infer<typeof ProviderTypeSchema>;
@@ -33,6 +34,14 @@ export const ProviderConfigSchema = z.object({
   env: StringRecordSchema.optional(),
   customHeaders: StringRecordSchema.optional(),
   source: z.record(z.string(), z.unknown()).optional(),
+  /** Local GGUF model path (only for `type: 'local'`). */
+  modelPath: z.string().optional(),
+  /** Context window size in tokens (only for `type: 'local'`). */
+  contextSize: z.number().int().min(1).optional(),
+  /** Number of GPU layers to offload (only for `type: 'local'`). */
+  gpuLayers: z.number().int().min(0).optional(),
+  /** Server listen port (only for `type: 'local'`). */
+  port: z.number().int().min(1024).max(65535).optional(),
 });
 
 export type ProviderConfig = z.infer<typeof ProviderConfigSchema>;

@@ -141,6 +141,26 @@ export function convertOpenAIError(error: unknown): ChatProviderError {
   if (error instanceof Error) {
     return classifyBaseApiError(error.message);
   }
+  // Handle plain object errors (e.g., from local.ts with body.error)
+  if (typeof error === 'object' && error !== null) {
+    const errObj = error as Record<string, unknown>;
+    const errorBody = errObj.body as Record<string, unknown> | undefined;
+    if (errorBody) {
+      const errorInfo = errorBody.error as Record<string, unknown> | undefined;
+      const message = errorInfo?.message ??
+                      errorBody.message ??
+                      (typeof errorBody.error === 'string' ? errorBody.error : undefined);
+      if (message) {
+        const statusCode = errObj['status'] as number | undefined;
+        const errorType = errorInfo?.['type'] as string | undefined;
+        const parts: string[] = [String(message)];
+        if (errorType) parts.push(`(type: ${errorType})`);
+        if (statusCode) parts.unshift(`[${statusCode}]`);
+        return new ChatProviderError(`Error: ${parts.join(' ')}`);
+      }
+    }
+    return new ChatProviderError(`Error: ${JSON.stringify(error)}`);
+  }
   return new ChatProviderError(`Error: ${String(error)}`);
 }
 /** Shape of a function-type tool call (subset used by the guard). */
