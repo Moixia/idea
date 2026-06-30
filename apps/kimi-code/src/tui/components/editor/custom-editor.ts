@@ -121,6 +121,7 @@ export class CustomEditor extends Editor {
   public onCtrlC?: () => void;
   public onToggleToolExpand?: () => void;
   public onToggleVerboseMode?: () => void;
+  public onToggleMcpVisibility?: () => void;
   public onOpenExternalEditor?: () => void;
   public onCtrlS?: () => void;
   /** Return `true` to consume Ctrl+B; return `false`/`undefined` to fall through to the editor default (cursor-left). */
@@ -382,6 +383,11 @@ export class CustomEditor extends Editor {
 
     if (matchesKey(normalized, Key.ctrl('w'))) {
       this.onToggleVerboseMode?.();
+      return;
+    }
+
+    if (matchesKey(normalized, Key.ctrl('m'))) {
+      this.onToggleMcpVisibility?.();
       return;
     }
 

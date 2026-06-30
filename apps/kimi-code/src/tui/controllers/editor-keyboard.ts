@@ -32,6 +32,7 @@ export interface EditorKeyboardHost {
   updateQueueDisplay(): void;
   toggleToolOutputExpansion(): void;
   toggleVerboseMode(): void;
+  toggleMcpVisibility(): void;
   toggleTodoPanelExpansion(): void;
   detachCurrentForegroundTask(): void;
   cancelRunningShellCommand(): void;
@@ -167,6 +168,11 @@ export class EditorKeyboardController {
     editor.onToggleVerboseMode = () => {
       host.track('shortcut_verbose');
       host.toggleVerboseMode();
+    };
+
+    editor.onToggleMcpVisibility = () => {
+      host.track('shortcut_mcp_visibility');
+      host.toggleMcpVisibility();
     };
 
     editor.onToggleTodoExpand = (): boolean => {

@@ -580,6 +580,7 @@ export class ToolCallComponent extends Container {
   private subagentStartedAtMs: number | undefined;
   private subagentEndedAtMs: number | undefined;
   private verboseMode = false;
+  private mcpVisible = false;
   private spinnerFrame = 0;
   private spinnerTimer: ReturnType<typeof setInterval> | undefined;
 
@@ -618,12 +619,14 @@ export class ToolCallComponent extends Container {
     ui?: TUI,
     private readonly workspaceDir?: string,
     verboseMode?: boolean,
+    mcpVisible?: boolean,
   ) {
     super();
     this.toolCall = toolCall;
     this.result = result;
     this.ui = ui;
     this.verboseMode = verboseMode ?? false;
+    this.mcpVisible = mcpVisible ?? false;
     this.applySubagentReplay(toolCall.subagent);
 
     this.addChild(new Spacer(1));
@@ -648,7 +651,7 @@ export class ToolCallComponent extends Container {
   override render(width: number): string[] {
     // In minimal mode with no result, only show the spinner header.
     // When the tool finishes, render nothing so the component collapses.
-    if (!this.verboseMode && this.result !== undefined) {
+    if (this.shouldSuppressOutput() && this.result !== undefined) {
       return [];
     }
 
@@ -1088,6 +1091,21 @@ export class ToolCallComponent extends Container {
     this.rebuildBody();
   }
 
+  setMcpVisible(v: boolean): void {
+    if (this.mcpVisible === v) return;
+    this.mcpVisible = v;
+    this.renderCache = undefined;
+    if (v && !this.verboseMode) {
+      // MCP output becomes visible independently — show full header
+      this.stopSpinnerTimer();
+    } else if (!v && !this.verboseMode) {
+      // MCP output hidden — show spinner
+      this.startSpinnerTimer();
+    }
+    this.headerText.setText(this.buildHeader());
+    this.rebuildBody();
+  }
+
   private startSpinnerTimer(): void {
     if (this.result !== undefined) return;
     if (this.ui === undefined || this.spinnerTimer !== undefined) return;
@@ -1428,12 +1446,12 @@ export class ToolCallComponent extends Container {
   }
 
   private buildHeader(): string {
-    const { toolCall, result, verboseMode } = this;
+    const { toolCall, result } = this;
     const isFinished = result !== undefined;
 
-    // In minimal mode (verboseMode off), show only a spinner while the tool
-    // is executing, and nothing when finished.
-    if (!verboseMode) {
+    // In minimal mode (output suppressed), show only a spinner while the
+    // tool is executing, and nothing when finished.
+    if (this.shouldSuppressOutput()) {
       if (isFinished) return '';
       const frame = BRAILLE_SPINNER_FRAMES[this.spinnerFrame] ?? BRAILLE_SPINNER_FRAMES[0]!;
       return `${currentTheme.fg('text', STATUS_BULLET)}${frame}`;
@@ -1515,14 +1533,28 @@ export class ToolCallComponent extends Container {
     return `${bullet}${verbPrefix}${toolLabel}${argStr}${chipStr}`;
   }
 
+  private isMcpTool(): boolean {
+    return decodeMcpToolName(this.toolCall.name) !== null;
+  }
+
+  /**
+   * Whether the tool's output should be suppressed in the TUI.
+   * Output is suppressed when verboseMode is off AND either the tool is
+   * not an MCP tool, or MCP visibility is also off.
+   * Ctrl+W (verboseMode) shows all tools; Ctrl+M (mcpVisible) shows MCP tools
+   * independently.
+   */
+  private shouldSuppressOutput(): boolean {
+    return !this.verboseMode && (!this.isMcpTool() || !this.mcpVisible);
+  }
+
   private isQuietTool(): boolean {
     const name = this.toolCall.name;
     return (
       name === 'Read' ||
       name === 'Glob' ||
       name === 'Grep' ||
-      name === 'Bash' ||
-      decodeMcpToolName(name) !== null
+      name === 'Bash'
     );
   }
 
@@ -1539,7 +1571,7 @@ export class ToolCallComponent extends Container {
     while (this.children.length > this.callPreviewEndIndex) {
       this.children.pop();
     }
-    if (!this.verboseMode) return;
+    if (this.shouldSuppressOutput()) return;
     this.buildProgressBlock();
     this.buildDetachHintBlock();
     this.buildLiveOutputBlock();
@@ -1551,7 +1583,7 @@ export class ToolCallComponent extends Container {
     while (this.children.length > 2) {
       this.children.pop();
     }
-    if (!this.verboseMode) {
+    if (this.shouldSuppressOutput()) {
       // In minimal mode only the header spinner is shown; no preview, no progress, no result.
       this.callPreviewEndIndex = this.children.length;
       return;
@@ -1922,7 +1954,7 @@ export class ToolCallComponent extends Container {
   }
 
   private buildCallPreview(): void {
-    if (!this.verboseMode) return;
+    if (this.shouldSuppressOutput()) return;
     const name = this.toolCall.name;
     if (name === 'ExitPlanMode') {
       this.buildPlanPreview();
@@ -2112,11 +2144,11 @@ export class ToolCallComponent extends Container {
   }
 
   private buildContent(): void {
-    const { result, verboseMode } = this;
+    const { result } = this;
     if (result === undefined) return;
 
     // In minimal mode, suppress all tool result content.
-    if (!verboseMode) return;
+    if (this.shouldSuppressOutput()) return;
 
     if (this.toolCall.name === 'AgentSwarm') {
       this.buildAgentSwarmResultSummary(result);
@@ -2165,7 +2197,7 @@ export class ToolCallComponent extends Container {
       return;
     }
 
-    // Read, Glob, Grep, and MCP tools: the model receives the full result,
+    // Read, Glob, Grep, and Bash: the model receives the full result,
     // but the TUI hides it to keep the transcript clean.
     if (this.isQuietTool()) {
       return;

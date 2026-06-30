@@ -17,7 +17,7 @@ export const FLAG_DEFINITIONS = [
     title: 'Sky mode',
     description: 'Replace conversation history with a free-form model-managed memory string written in <sky></sky> tags.',
     env: 'KIMI_CODE_EXPERIMENTAL_SKY_MODE',
-    default: false,
+    default: true,
     surface: 'core',
   },
   {

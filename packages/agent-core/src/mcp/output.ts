@@ -12,13 +12,15 @@
  *     parts (image/audio/video URLs) each carry an independent 10 MB cap and
  *     collapse to a notice when oversize, so a single screenshot cannot
  *     evict every text part.
- *  4. Collapse a single-text-part result to a plain string output; otherwise
+ *  4. Apply TOON encoding to JSON text parts for token-efficient model input.
+ *  5. Collapse a single-text-part result to a plain string output; otherwise
  *     emit the `ContentPart[]` as-is.
  *
  * `mcpResultToExecutableOutput` is the single entry point; the per-step
  * helpers stay private so callers cannot bypass the limits.
  */
 
+import { encode } from '@toon-format/toon';
 import type { ContentPart } from '@moonshot-ai/kosong';
 
 import type { MCPContentBlock, MCPToolResult } from './types';
@@ -144,7 +146,8 @@ export function mcpResultToExecutableOutput(
 
   const wrapped = wrapMediaOnly(converted, qualifiedToolName);
   const limited = applyOutputLimits(wrapped);
-  const output = collapseSingleText(limited.parts);
+  const encoded = applyToonEncoding(limited.parts);
+  const output = collapseSingleText(encoded);
   return limited.truncated
     ? { output, isError: result.isError, truncated: true }
     : { output, isError: result.isError };
@@ -266,4 +269,29 @@ function collapseSingleText(parts: readonly ContentPart[]): string | ContentPart
     return parts[0].text;
   }
   return [...parts];
+}
+
+/**
+ * Apply TOON encoding to text parts that contain valid JSON (the most common
+ * shape of MCP server output). This makes the output more token-efficient and
+ * readable for the model, and the TUI renders it directly.
+ *
+ * Disabled via `KIMI_CODE_MCP_TOON_DISABLE=1` to compare against raw JSON.
+ */
+function applyToonEncoding(parts: readonly ContentPart[]): ContentPart[] {
+  if (process.env.KIMI_CODE_MCP_TOON_DISABLE === '1') {
+    return [...parts];
+  }
+  return parts.map((part) => {
+    if (part.type !== 'text' || part.text.length === 0) return part;
+    try {
+      const parsed = JSON.parse(part.text);
+      if (typeof parsed === 'object' && parsed !== null) {
+        return { type: 'text', text: encode(parsed) };
+      }
+    } catch {
+      // Not valid JSON — leave the text as-is (e.g. plain status messages).
+    }
+    return part;
+  });
 }

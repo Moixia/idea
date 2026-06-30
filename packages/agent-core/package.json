@@ -65,6 +65,7 @@
     "@moonshot-ai/kosong": "workspace:^",
     "@moonshot-ai/protocol": "workspace:^",
     "@mozilla/readability": "^0.6.0",
+    "@toon-format/toon": "^2.3.0",
     "ajv": "^8.18.0",
     "ajv-formats": "^3.0.1",
     "chokidar": "^4.0.3",

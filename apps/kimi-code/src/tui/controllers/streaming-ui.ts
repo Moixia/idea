@@ -652,6 +652,7 @@ export class StreamingUIController {
       state.ui,
       state.appState.workDir,
       state.verboseMode,
+      state.mcpVisible,
     );
     if (state.toolOutputExpanded) tc.setExpanded(true);
     this._pendingToolComponents.set(toolCall.id, tc);
@@ -698,6 +699,7 @@ export class StreamingUIController {
         state.ui,
         state.appState.workDir,
         state.verboseMode,
+        state.mcpVisible,
       );
       if (state.toolOutputExpanded) completed.setExpanded(true);
       state.transcriptContainer.addChild(completed);

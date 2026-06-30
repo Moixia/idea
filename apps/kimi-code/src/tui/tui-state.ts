@@ -45,6 +45,7 @@ export interface TUIState {
   activitySpinner: { instance: MoonLoader; style: string } | null;
   toolOutputExpanded: boolean;
   verboseMode: boolean;
+  mcpVisible: boolean;
   sessions: SessionRow[];
   loadingSessions: boolean;
   sessionsScope: 'cwd' | 'all';
@@ -95,6 +96,7 @@ export function createTUIState(options: KimiTUIOptions): TUIState {
     activitySpinner: null,
     toolOutputExpanded: false,
     verboseMode: false,
+    mcpVisible: false,
     sessions: [],
     loadingSessions: false,
     sessionsScope: 'cwd',

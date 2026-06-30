@@ -277,15 +277,15 @@ describe('mcpResultToExecutableOutput', () => {
     expect(parts.at(-1)).toEqual({ type: 'text', text: '</mcp_tool_result>' });
   });
 
-  test('truncates oversized text and merges the notice into the surviving text part', () => {
+  test('preserves oversized text since MCP_MAX_OUTPUT_CHARS is Infinity', () => {
     const out = mcpResultToExecutableOutput(
       result([{ type: 'text', text: 'x'.repeat(100_001) }]),
       'mcp__s__t',
     );
-    // The notice merges into the single text part so collapseSingleText still
-    // emits a plain string — the very common "single oversized text" case.
-    expect(out.output).toBe('x'.repeat(100_000) + MCP_OUTPUT_TRUNCATED_TEXT);
-    expect(out.truncated).toBe(true);
+    // MCP text limits are Infinity, so the full output survives and
+    // collapseSingleText emits a plain string.
+    expect(out.output).toBe('x'.repeat(100_001));
+    expect(out.truncated).toBeUndefined();
   });
 
   test('drops oversized binary parts in favor of a per-part notice without touching the text budget', () => {

@@ -1708,6 +1708,7 @@ export class KimiTUI {
             this.state.ui,
             this.state.appState.workDir,
             this.state.verboseMode,
+            this.state.mcpVisible,
           );
           if (this.state.toolOutputExpanded) tc.setExpanded(true);
           return tc;
@@ -2250,6 +2251,18 @@ export class KimiTUI {
       const child = children[i]!;
       if (child instanceof ToolCallComponent) {
         child.setVerboseMode(this.state.verboseMode);
+      }
+    }
+    this.state.ui.requestRender();
+  }
+
+  toggleMcpVisibility(): void {
+    this.state.mcpVisible = !this.state.mcpVisible;
+    const children = this.state.transcriptContainer.children;
+    for (let i = 0; i < children.length; i++) {
+      const child = children[i]!;
+      if (child instanceof ToolCallComponent) {
+        child.setMcpVisible(this.state.mcpVisible);
       }
     }
     this.state.ui.requestRender();
