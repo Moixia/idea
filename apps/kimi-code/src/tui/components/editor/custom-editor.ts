@@ -386,7 +386,7 @@ export class CustomEditor extends Editor {
       return;
     }
 
-    if (matchesKey(normalized, Key.ctrl('m'))) {
+    if (matchesKey(normalized, 'alt+m')) {
       this.onToggleMcpVisibility?.();
       return;
     }
