@@ -74,7 +74,6 @@ export class KosongLLM implements LLM {
   readonly modelName: string;
   readonly capability?: ModelCapability | undefined;
   readonly providerName: string | undefined;
-
   private readonly provider: ChatProvider;
   private readonly generate: GenerateFn;
   private readonly completionBudgetConfig: CompletionBudgetConfig | undefined;
@@ -123,10 +122,8 @@ export class KosongLLM implements LLM {
       requestLogFields: params.requestLogFields,
     };
 
-    // For local provider, skip system prompt and tools to avoid context overflow
-    const isLocal = this.providerName === 'local';
-    const effectiveSystemPrompt = isLocal ? '' : this.systemPrompt;
-    const effectiveTools = isLocal ? [] : [...params.tools];
+    const effectiveSystemPrompt = this.systemPrompt;
+    const effectiveTools = [...params.tools];
 
     const result = await this.generate(
       effectiveProvider,

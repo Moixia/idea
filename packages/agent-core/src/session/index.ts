@@ -34,6 +34,7 @@ import type { EnabledPluginSessionStart } from '../plugin';
 import {
   DEFAULT_AGENT_PROFILES,
   DEFAULT_INIT_PROMPT,
+  LOCAL_AGENT_PROFILES,
   loadAgentsMd,
   prepareSystemPromptContext,
   type ResolvedAgentProfile,
@@ -465,12 +466,46 @@ export class Session {
     agent: Agent,
     profile: ResolvedAgentProfile,
   ): Promise<void> {
+    await this.applyProfileForModel(agent, profile);
+  }
+
+  /** Re-evaluate provider type and re-apply profile with local detection. */
+  async applyProfileForModel(
+    agent: Agent,
+    baseProfile: ResolvedAgentProfile,
+  ): Promise<void> {
+    // Detect local provider → use lite profile and restrict tools
+    let effectiveProfile: ResolvedAgentProfile = baseProfile;
+    let useLocalProfile = false;
+    try {
+      const alias = agent.config.modelAlias;
+      if (alias !== undefined && agent.modelProvider !== undefined) {
+        const resolved = agent.modelProvider.resolveProviderConfig(alias);
+        useLocalProfile = resolved.type === 'local';
+        console.log('[local-detect]', { alias, type: resolved.type, useLocalProfile });
+      } else {
+        console.log('[local-detect] skipped', { alias, hasProvider: agent.modelProvider !== undefined });
+      }
+    } catch (err) {
+      console.log('[local-detect] threw', { alias: agent.config.modelAlias, error: String(err) });
+    }
+
+    if (useLocalProfile) {
+      effectiveProfile = LOCAL_AGENT_PROFILES['agent'] ?? baseProfile;
+    }
+
     const context = await prepareSystemPromptContext(
       this.systemContextKaos(agent.kaos.getcwd()),
       this.options.kimiHomeDir,
       { additionalDirs: this.additionalDirs },
     );
-    agent.useProfile(profile, context);
+    agent.useProfile(effectiveProfile, context);
+
+    if (useLocalProfile) {
+      // Restrict active tools to the 6 real tools the lite prompt describes
+      agent.tools.setActiveTools(['Bash', 'Read', 'Edit', 'Grep', 'Glob', 'Write']);
+    }
+
     const { agentsMdWarning } = context;
     if (agentsMdWarning !== undefined) {
       this.agentsMdWarning = agentsMdWarning;

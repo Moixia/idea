@@ -37,6 +37,7 @@ import type {
 import type { PromisableMethods } from '#/utils/types';
 
 import type { Session, SessionMeta } from '.';
+import { DEFAULT_AGENT_PROFILES } from '../profile';
 import {
   promptMetadataTextFromPayload,
   promptMetadataTextFromSkill,
@@ -132,7 +133,10 @@ export class SessionAPIImpl implements PromisableMethods<SessionAPI> {
   }
 
   async setModel({ agentId, ...payload }: AgentScopedPayload<SetModelPayload>) {
-    return (await this.getAgent(agentId)).setModel(payload);
+    const realAgent = await this.session.ensureAgentResumed(agentId);
+    const result = realAgent.rpcMethods.setModel(payload);
+    await this.session.applyProfileForModel(realAgent, DEFAULT_AGENT_PROFILES['agent']);
+    return result;
   }
 
   async setThinking({ agentId, ...payload }: AgentScopedPayload<SetThinkingPayload>) {

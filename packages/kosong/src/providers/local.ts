@@ -545,10 +545,21 @@ export class LocalChatProvider implements ChatProvider {
         headers['Authorization'] = `Bearer ${this.options.apiKey}`;
       }
 
+      const bodyJson = JSON.stringify(body);
+      // TEMP: dump full request payload for local model debugging
+      console.log('=== LOCAL REQUEST DUMP ===');
+      console.log(JSON.stringify({
+        systemPrompt,
+        systemPromptLength: systemPrompt.length,
+        systemPromptTokens: Math.ceil(systemPrompt.length / 3.5),
+        toolsCount: tools.length,
+        tools: body['tools'] ?? [],
+        payloadByteLength: bodyJson.length,
+      }, null, 2));
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(body),
+        body: bodyJson,
         signal: options?.signal,
       });
 

@@ -1,10 +1,11 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, statSync } from 'node:fs';
+import { cpus } from 'node:os';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const LLAMA_SERVER_DEFAULT_PORT = 18080;
-export const LLAMA_SERVER_DEFAULT_CONTEXT_SIZE = 131_072;
+export const LLAMA_SERVER_DEFAULT_CONTEXT_SIZE = 16_384;
 export const LLAMA_SERVER_READY_TIMEOUT_MS = 180_000;
 export const LLAMA_SERVER_HEALTH_POLL_MS = 500;
 
@@ -13,7 +14,7 @@ export interface LlamaServerOptions {
   readonly modelPath: string;
   /** Server listen port (default 18080). */
   readonly port?: number;
-  /** Context window size (default 131072). */
+  /** Context window size (default 16384). */
   readonly contextSize?: number;
   /** GPU layers to offload, 0 = CPU-only (default 0). */
   readonly gpuLayers?: number;
@@ -413,12 +414,20 @@ export class LlamaServerProcess {
     const port = options.port ?? LLAMA_SERVER_DEFAULT_PORT;
     this._port = port;
 
+    const logicalCores = cpus().length;
+    const physicalCores = logicalCores <= 4 ? logicalCores : Math.floor(logicalCores * 0.5);
+    const threads = Math.max(4, Math.min(physicalCores, 8));
+    const batchSize = ctxSize >= 16384 ? 4096 : 2048;
+
     return [
       '-m', options.modelPath,
       '--port', String(port),
       '--host', '127.0.0.1',
       '-c', String(ctxSize),
       '-ngl', String(gpuLayers),
+      '--threads', String(threads),
+      '--threads-batch', String(threads),
+      '--batch-size', String(batchSize),
       '--no-ui',
       '--cont-batching',
       '-np', '1',
