@@ -53,7 +53,7 @@ export interface LocalOptions {
   apiKey?: string;
   /** Base URL for the local llama-server (default http://127.0.0.1:18080). */
   baseUrl?: string;
-  /** Context window size in tokens (default 4096). */
+  /** Context window size in tokens (default 131072). */
   contextSize?: number;
   /** Number of GPU layers to offload (0 = CPU-only, default 0). */
   gpuLayers?: number;

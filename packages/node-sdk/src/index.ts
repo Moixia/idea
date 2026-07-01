@@ -58,6 +58,8 @@ export {
 } from '@moonshot-ai/agent-core';
 export type { LogContext, LogLevel, LogPayload, Logger } from '@moonshot-ai/agent-core';
 
+export { LLAMA_SERVER_DEFAULT_CONTEXT_SIZE } from '@moonshot-ai/kosong';
+
 // Host-side config helpers — safe config reader + config path resolution, used
 // by hosts (e.g. the CLI's server telemetry bootstrap) that need to inspect
 // config without spinning up a full KimiCore.

@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { basename, resolve, dirname } from 'pathe';
+import { LLAMA_SERVER_DEFAULT_CONTEXT_SIZE } from '@moonshot-ai/kimi-code-sdk';
 
 import type { SlashCommandHost } from './dispatch';
 import { formatErrorMessage } from '../utils/event-payload';
@@ -10,7 +11,6 @@ import { formatErrorMessage } from '../utils/event-payload';
 // ---------------------------------------------------------------------------
 
 const DEFAULT_PORT = 18080;
-const DEFAULT_CONTEXT_SIZE = 4096;
 const LOCAL_PROVIDER_ID = 'local';
 
 /** Standard locations probed in order. */
@@ -131,20 +131,25 @@ export async function handleEnableLocalCommand(
     type: 'local',
     modelPath,
     port: DEFAULT_PORT,
-    contextSize: DEFAULT_CONTEXT_SIZE,
+    contextSize: LLAMA_SERVER_DEFAULT_CONTEXT_SIZE,
   };
 
-  // 5. Build model alias (if not already present)
+  // 5. Reconcile local model aliases. The command owns the local provider
+  // entry, so stale aliases from older context-size defaults must not survive.
   if (config.models === undefined) config.models = {};
-  if (!(modelAlias in config.models)) {
-    config.models[modelAlias] = {
-      provider: LOCAL_PROVIDER_ID,
-      model: modelShortId,
-      maxContextSize: DEFAULT_CONTEXT_SIZE,
-      capabilities: ['thinking', 'tool_use'],
-      displayName: modelShortId,
-    };
+  for (const [alias, aliasConfig] of Object.entries(config.models)) {
+    if (aliasConfig.provider === LOCAL_PROVIDER_ID) {
+      // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
+      delete config.models[alias];
+    }
   }
+  config.models[modelAlias] = {
+    provider: LOCAL_PROVIDER_ID,
+    model: modelShortId,
+    maxContextSize: LLAMA_SERVER_DEFAULT_CONTEXT_SIZE,
+    capabilities: ['thinking', 'tool_use'],
+    displayName: modelShortId,
+  };
 
   // 6. Persist
   await host.harness.setConfig({
@@ -177,7 +182,7 @@ export async function handleEnableLocalCommand(
   });
 
   host.showStatus(
-    `Local provider enabled and selected: ${modelAlias} (port ${DEFAULT_PORT}, thinking on).`,
+    `Local provider enabled and selected: ${modelAlias} (${LLAMA_SERVER_DEFAULT_CONTEXT_SIZE} context, port ${DEFAULT_PORT}, thinking on).`,
   );
 }
 

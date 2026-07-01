@@ -82,6 +82,7 @@ export {
 export {
   LlamaServerProcess,
   resolveLlamaServerPath,
+  LLAMA_SERVER_DEFAULT_CONTEXT_SIZE,
   LLAMA_SERVER_DEFAULT_PORT,
   LLAMA_SERVER_READY_TIMEOUT_MS,
 } from './local/llama-server-process.js';

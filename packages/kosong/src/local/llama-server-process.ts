@@ -4,6 +4,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const LLAMA_SERVER_DEFAULT_PORT = 18080;
+export const LLAMA_SERVER_DEFAULT_CONTEXT_SIZE = 131_072;
 export const LLAMA_SERVER_READY_TIMEOUT_MS = 180_000;
 export const LLAMA_SERVER_HEALTH_POLL_MS = 500;
 
@@ -12,7 +13,7 @@ export interface LlamaServerOptions {
   readonly modelPath: string;
   /** Server listen port (default 18080). */
   readonly port?: number;
-  /** Context window size (default 4096). */
+  /** Context window size (default 131072). */
   readonly contextSize?: number;
   /** GPU layers to offload, 0 = CPU-only (default 0). */
   readonly gpuLayers?: number;
@@ -407,7 +408,7 @@ export class LlamaServerProcess {
   }
 
   private buildArgs(options: LlamaServerOptions): string[] {
-    const ctxSize = options.contextSize ?? 4096;
+    const ctxSize = options.contextSize ?? LLAMA_SERVER_DEFAULT_CONTEXT_SIZE;
     const gpuLayers = options.gpuLayers ?? 0;
     const port = options.port ?? LLAMA_SERVER_DEFAULT_PORT;
     this._port = port;

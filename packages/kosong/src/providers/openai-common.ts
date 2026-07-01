@@ -144,12 +144,12 @@ export function convertOpenAIError(error: unknown): ChatProviderError {
   // Handle plain object errors (e.g., from local.ts with body.error)
   if (typeof error === 'object' && error !== null) {
     const errObj = error as Record<string, unknown>;
-    const errorBody = errObj.body as Record<string, unknown> | undefined;
+    const errorBody = errObj['body'] as Record<string, unknown> | undefined;
     if (errorBody) {
-      const errorInfo = errorBody.error as Record<string, unknown> | undefined;
-      const message = errorInfo?.message ??
-                      errorBody.message ??
-                      (typeof errorBody.error === 'string' ? errorBody.error : undefined);
+      const errorInfo = errorBody['error'] as Record<string, unknown> | undefined;
+      const message = errorInfo?.['message'] ??
+                      errorBody['message'] ??
+                      (typeof errorBody['error'] === 'string' ? errorBody['error'] : undefined);
       if (message) {
         const statusCode = errObj['status'] as number | undefined;
         const errorType = errorInfo?.['type'] as string | undefined;
