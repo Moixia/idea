@@ -5,7 +5,7 @@
  * Supports expand/collapse via Ctrl+O (shared with tool output).
  */
 
-import { Text, type Component, type TUI } from '@earendil-works/pi-tui';
+import { Text, type Component, type TUI } from '@moonshot-ai/pi-tui';
 
 import {
   BRAILLE_SPINNER_FRAMES,

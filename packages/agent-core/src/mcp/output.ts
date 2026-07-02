@@ -8,28 +8,44 @@
  *  2. Wrap media-only outputs in `<mcp_tool_result name="…">` tags so the
  *     model can attribute binary output when several tools return media.
  *     Mirrors the in-tree `ReadMediaFile` convention.
- *  3. Apply size limits: text/think share a 512K character budget; binary
- *     parts (image/audio/video URLs) each carry an independent 10 MB cap and
- *     collapse to a notice when oversize, so a single screenshot cannot
- *     evict every text part.
- *  4. Apply TOON encoding to JSON text parts for token-efficient model input.
- *  5. Collapse a single-text-part result to a plain string output; otherwise
+ *  3. Apply the 100K text/think character budget to the tool's own text.
+ *     This runs BEFORE captions exist, so a chatty tool (page text + a
+ *     screenshot) can never evict or slice the compression caption — that
+ *     would silently reintroduce the very degradation the caption reports.
+ *  4. Compress oversized inline images, announcing each compression with a
+ *     caption (original vs. sent size, readback path to the persisted
+ *     original) so downsampling is never silent.
+ *  5. Apply the per-part 10 MB binary cap: oversized binary parts
+ *     (image/audio/video URLs) collapse to a notice, so a single
+ *     screenshot cannot evict every text part.
+ *  6. Collapse a single-text-part result to a plain string output; otherwise
  *     emit the `ContentPart[]` as-is.
  *
  * `mcpResultToExecutableOutput` is the single entry point; the per-step
  * helpers stay private so callers cannot bypass the limits.
  */
 
-import { encode } from '@toon-format/toon';
+
 import type { ContentPart } from '@moonshot-ai/kosong';
 
+import { compressImageContentParts } from '../tools/support/image-compress';
+import { persistOriginalImage } from '../tools/support/image-originals';
 import type { MCPContentBlock, MCPToolResult } from './types';
+
+export interface McpOutputOptions {
+  /**
+   * Session-owned directory for pre-compression originals (typically
+   * `sessionMediaOriginalsDir(sessionDir)` threaded down from the agent).
+   * Falls back to the shared temp-dir cache when absent.
+   */
+  readonly originalsDir?: string | undefined;
+}
 
 // MCP servers can produce arbitrarily large outputs; cap what we feed back to
 // the model so a single chatty server does not blow up the context window. The
 // notice text is fed to the model verbatim so it can react (e.g. paginate),
 // which is why the limits live in the agent layer rather than in kosong.
-export const MCP_MAX_OUTPUT_CHARS = Infinity;
+export const MCP_MAX_OUTPUT_CHARS = 100_000;
 const MCP_OUTPUT_TRUNCATED_TEXT = `\n\n[Output truncated: exceeded ${String(
   MCP_MAX_OUTPUT_CHARS,
 )} character limit. Use pagination or more specific queries to get remaining content.]`;
@@ -132,10 +148,11 @@ export function convertMCPContentBlock(block: MCPContentBlock): ContentPart | nu
  * `mcp__github__create_pr`) — embedded into the `<mcp_tool_result name="…">`
  * wrap when the result is media-only, so the model can attribute binary parts.
  */
-export function mcpResultToExecutableOutput(
+export async function mcpResultToExecutableOutput(
   result: MCPToolResult,
   qualifiedToolName: string,
-): { output: string | ContentPart[]; isError: boolean; truncated?: true } {
+  options: McpOutputOptions = {},
+): Promise<{ output: string | ContentPart[]; isError: boolean; truncated?: true }> {
   const converted: ContentPart[] = [];
   for (const block of result.content) {
     const part = convertMCPContentBlock(block);
@@ -145,10 +162,32 @@ export function mcpResultToExecutableOutput(
   }
 
   const wrapped = wrapMediaOnly(converted, qualifiedToolName);
-  const limited = applyOutputLimits(wrapped);
-  const encoded = applyToonEncoding(limited.parts);
-  const output = collapseSingleText(encoded);
-  return limited.truncated
+  // Text budget FIRST, on the tool's own text only: captions inserted by the
+  // compression step below must never compete with a chatty tool's text for
+  // the budget — an evicted or mid-string-sliced caption silently
+  // reintroduces the downsampling this pipeline promises to announce.
+  const budgeted = applyTextBudget(wrapped);
+  // Shrink oversized images BEFORE the per-part byte cap, so a large but
+  // compressible screenshot is downsampled and kept rather than dropped to a
+  // text notice. Compression is never silent: each re-encoded image gains a
+  // caption stating what the original was, and the original bytes are
+  // persisted (best effort, into the session's media-originals dir when
+  // known) so the model can read detail back via ReadMediaFile + region.
+  // Parts that cannot be compressed pass through.
+  const compressed = await compressImageContentParts(budgeted.parts, {
+    annotate: {
+      persistOriginal: (bytes, mimeType) =>
+        persistOriginalImage(
+          bytes,
+          mimeType,
+          options.originalsDir === undefined ? {} : { dir: options.originalsDir },
+        ),
+    },
+  });
+  const capped = applyBinaryPartCap(compressed);
+  const truncated = budgeted.truncated || capped.truncated;
+  const output = collapseSingleText(capped.parts);
+  return truncated
     ? { output, isError: result.isError, truncated: true }
     : { output, isError: result.isError };
 }
@@ -172,33 +211,33 @@ function wrapMediaOnly(parts: readonly ContentPart[], qualifiedToolName: string)
 }
 
 /**
- * Apply the 512K text/think budget and the per-part 10 MB binary cap.
+ * Apply the 100K text/think budget. Runs before image compression, so only
+ * the tool's own text is charged — compression captions inserted afterwards
+ * are exempt by construction. Binary parts pass through untouched (their
+ * independent per-part cap is {@link applyBinaryPartCap}).
  *
- * When text/think parts get truncated, the truncation notice is prepended to
- * the first surviving text part — this keeps the single-text-part collapse
- * working while ensuring the model sees the pagination hint before the data.
+ * When text/think parts get truncated, the truncation notice is appended to
+ * the last surviving text part — this keeps the single-text-part collapse
+ * working when the entire (oversized) input is a single text block.
  */
-function applyOutputLimits(parts: readonly ContentPart[]): {
+function applyTextBudget(parts: readonly ContentPart[]): {
   readonly parts: ContentPart[];
   readonly truncated: boolean;
 } {
   let remaining = MCP_MAX_OUTPUT_CHARS;
   let truncated = false;
-  let textTruncated = false;
   const out: ContentPart[] = [];
 
   for (const part of parts) {
     if (part.type === 'text') {
       if (remaining <= 0) {
         truncated = true;
-        textTruncated = true;
         continue;
       }
       if (part.text.length > remaining) {
         out.push({ type: 'text', text: part.text.slice(0, remaining) });
         remaining = 0;
         truncated = true;
-        textTruncated = true;
       } else {
         out.push(part);
         remaining -= part.text.length;
@@ -210,14 +249,12 @@ function applyOutputLimits(parts: readonly ContentPart[]): {
       const size = part.think.length + (part.encrypted?.length ?? 0);
       if (remaining <= 0) {
         truncated = true;
-        textTruncated = true;
         continue;
       }
       if (size > remaining) {
         out.push({ type: 'think', think: part.think.slice(0, remaining) });
         remaining = 0;
         truncated = true;
-        textTruncated = true;
       } else {
         out.push(part);
         remaining -= size;
@@ -225,9 +262,35 @@ function applyOutputLimits(parts: readonly ContentPart[]): {
       continue;
     }
 
-    // image_url / audio_url / video_url: per-part byte cap, independent of the
-    // text character budget. Oversized parts collapse into a per-part notice so
-    // the model can pick a smaller resource instead of silently losing the blob.
+    out.push(part);
+  }
+
+  if (truncated) {
+    appendTruncationNotice(out);
+  }
+  return { parts: out, truncated };
+}
+
+/**
+ * Apply the per-part 10 MB binary cap, independent of the text character
+ * budget. Oversized parts collapse into a per-part notice so the model can
+ * pick a smaller resource instead of silently losing the blob. Runs after
+ * image compression, so a large but compressible image has already been
+ * shrunk under the cap.
+ */
+function applyBinaryPartCap(parts: readonly ContentPart[]): {
+  readonly parts: ContentPart[];
+  readonly truncated: boolean;
+} {
+  let truncated = false;
+  const out: ContentPart[] = [];
+
+  for (const part of parts) {
+    if (part.type === 'text' || part.type === 'think') {
+      out.push(part);
+      continue;
+    }
+
     const url =
       part.type === 'image_url'
         ? part.imageUrl.url
@@ -244,24 +307,22 @@ function applyOutputLimits(parts: readonly ContentPart[]): {
     out.push(part);
   }
 
-  if (textTruncated) {
-    prependTruncationNotice(out);
-  }
+
   return { parts: out, truncated };
 }
 
-function prependTruncationNotice(out: ContentPart[]): void {
-  // Merge the notice into the first surviving text part so the model sees the
-  // pagination hint before the data. Falls back to a standalone notice part if
-  // there is no text part to merge with.
-  for (let i = 0; i < out.length; i++) {
+function appendTruncationNotice(out: ContentPart[]): void {
+  // Merge the notice into the last text part so the very common
+  // "single oversized text" case still collapses to a plain string. Falls
+  // back to a standalone notice part if there is no text part to merge with.
+  for (let i = out.length - 1; i >= 0; i--) {
     const candidate = out[i];
     if (candidate?.type === 'text') {
-      out[i] = { type: 'text', text: MCP_OUTPUT_TRUNCATED_TEXT + '\n\n' + candidate.text };
+      out[i] = { type: 'text', text: candidate.text + MCP_OUTPUT_TRUNCATED_TEXT };
       return;
     }
   }
-  out.unshift({ type: 'text', text: MCP_OUTPUT_TRUNCATED_TEXT });
+  out.push({ type: 'text', text: MCP_OUTPUT_TRUNCATED_TEXT });
 }
 
 function collapseSingleText(parts: readonly ContentPart[]): string | ContentPart[] {
@@ -269,29 +330,4 @@ function collapseSingleText(parts: readonly ContentPart[]): string | ContentPart
     return parts[0].text;
   }
   return [...parts];
-}
-
-/**
- * Apply TOON encoding to text parts that contain valid JSON (the most common
- * shape of MCP server output). This makes the output more token-efficient and
- * readable for the model, and the TUI renders it directly.
- *
- * Disabled via `KIMI_CODE_MCP_TOON_DISABLE=1` to compare against raw JSON.
- */
-function applyToonEncoding(parts: readonly ContentPart[]): ContentPart[] {
-  if (process.env['KIMI_CODE_MCP_TOON_DISABLE'] === '1') {
-    return [...parts];
-  }
-  return parts.map((part) => {
-    if (part.type !== 'text' || part.text.length === 0) return part;
-    try {
-      const parsed = JSON.parse(part.text);
-      if (typeof parsed === 'object' && parsed !== null) {
-        return { type: 'text', text: encode(parsed) };
-      }
-    } catch {
-      // Not valid JSON — leave the text as-is (e.g. plain status messages).
-    }
-    return part;
-  });
 }

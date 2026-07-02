@@ -30,11 +30,10 @@ import {
   type McpServerEntry,
   type SessionMcpConfig,
 } from '../mcp';
-import type { EnabledPluginSessionStart } from '../plugin';
+import type { EnabledPluginSessionStart, PluginCommandDef } from '../plugin';
 import {
   DEFAULT_AGENT_PROFILES,
   DEFAULT_INIT_PROMPT,
-  LOCAL_AGENT_PROFILES,
   loadAgentsMd,
   prepareSystemPromptContext,
   type ResolvedAgentProfile,
@@ -50,6 +49,7 @@ import {
 } from '../skill';
 import { noopTelemetryClient, type TelemetryClient } from '../telemetry';
 import { SessionSubagentHost } from './subagent-host';
+import { sessionMediaOriginalsDir } from '../tools/support/image-originals';
 import type { ToolServices } from '../tools/support/services';
 import { FlagResolver, type ExperimentalFlagResolver } from '../flags';
 import { abortError } from '../utils/abort';
@@ -72,6 +72,7 @@ export interface SessionOptions {
   readonly mcpConfig?: SessionMcpConfig;
   readonly telemetry?: TelemetryClient | undefined;
   readonly pluginSessionStarts?: readonly EnabledPluginSessionStart[];
+  readonly pluginCommands?: readonly PluginCommandDef[];
   readonly appVersion?: string;
   readonly experimentalFlags?: ExperimentalFlagResolver;
   readonly additionalDirs?: readonly string[];
@@ -161,6 +162,7 @@ export class Session {
   private toolKaos: Kaos;
   private persistenceKaos: Kaos;
   private additionalDirs: readonly string[];
+  private readonly pluginCommands: readonly PluginCommandDef[];
   private agentIdCounter = 0;
   private readonly skillsReady: Promise<void>;
   metadata: SessionMeta = {
@@ -198,6 +200,7 @@ export class Session {
     this.toolKaos = options.kaos;
     this.persistenceKaos = options.persistenceKaos ?? options.kaos;
     this.additionalDirs = normalizeAdditionalDirs(options.additionalDirs ?? []);
+    this.pluginCommands = options.pluginCommands ?? [];
     this.skills = new SessionSkillRegistry({
       sessionId: options.id,
     });
@@ -466,46 +469,12 @@ export class Session {
     agent: Agent,
     profile: ResolvedAgentProfile,
   ): Promise<void> {
-    await this.applyProfileForModel(agent, profile);
-  }
-
-  /** Re-evaluate provider type and re-apply profile with local detection. */
-  async applyProfileForModel(
-    agent: Agent,
-    baseProfile: ResolvedAgentProfile,
-  ): Promise<void> {
-    // Detect local provider → use lite profile and restrict tools
-    let effectiveProfile: ResolvedAgentProfile = baseProfile;
-    let useLocalProfile = false;
-    try {
-      const alias = agent.config.modelAlias;
-      if (alias !== undefined && agent.modelProvider !== undefined) {
-        const resolved = agent.modelProvider.resolveProviderConfig(alias);
-        useLocalProfile = resolved.type === 'local';
-        console.log('[local-detect]', { alias, type: resolved.type, useLocalProfile });
-      } else {
-        console.log('[local-detect] skipped', { alias, hasProvider: agent.modelProvider !== undefined });
-      }
-    } catch (err) {
-      console.log('[local-detect] threw', { alias: agent.config.modelAlias, error: String(err) });
-    }
-
-    if (useLocalProfile) {
-      effectiveProfile = LOCAL_AGENT_PROFILES['agent'] ?? baseProfile;
-    }
-
     const context = await prepareSystemPromptContext(
       this.systemContextKaos(agent.kaos.getcwd()),
       this.options.kimiHomeDir,
       { additionalDirs: this.additionalDirs },
     );
-    agent.useProfile(effectiveProfile, context);
-
-    if (useLocalProfile) {
-      // Restrict active tools to the 6 real tools the lite prompt describes
-      agent.tools.setActiveTools(['Bash', 'Read', 'Edit', 'Grep', 'Glob', 'Write']);
-    }
-
+    agent.useProfile(profile, context, this.options.kimiHomeDir);
     const { agentsMdWarning } = context;
     if (agentsMdWarning !== undefined) {
       this.agentsMdWarning = agentsMdWarning;
@@ -669,6 +638,10 @@ export class Session {
     return this.skills.listSkills().map(summarizeSkill);
   }
 
+  listPluginCommands(): readonly PluginCommandDef[] {
+    return this.pluginCommands;
+  }
+
   private async loadSkills(): Promise<void> {
     const roots = await resolveSkillRoots({
       paths: {
@@ -753,13 +726,17 @@ export class Session {
   ): Agent {
     const parentAgent = parentAgentId !== null ? this.getReadyAgent(parentAgentId) : undefined;
     const cwd = parentAgent?.config.cwd ?? this.toolKaos.getcwd();
-    return new Agent({
+    let agent!: Agent;
+    agent = new Agent({
       ...config,
       type,
       kaos: this.toolKaos.withCwd(cwd),
       toolServices: this.options.toolServices,
       config: this.options.config,
       homedir,
+      // Session-level, shared across agents: originals persisted for
+      // compression captions live with the session, not the agent.
+      mediaOriginalsDir: sessionMediaOriginalsDir(this.options.homedir),
       skills: this.skills,
       rpc: proxyWithExtraPayload(this.rpc, { agentId: id }),
       modelProvider: this.options.providerManager,
@@ -770,9 +747,17 @@ export class Session {
       telemetry: this.telemetry,
       log: this.log.createChild({ agentId: id }),
       pluginSessionStarts: type === 'main' ? this.options.pluginSessionStarts : undefined,
+      pluginCommands: type === 'main' ? this.options.pluginCommands : undefined,
       experimentalFlags: this.experimentalFlags,
       additionalDirs: parentAgent?.getAdditionalDirs() ?? this.additionalDirs,
+      systemPromptContextProvider: () =>
+        prepareSystemPromptContext(
+          this.systemContextKaos(agent.kaos.getcwd()),
+          this.options.kimiHomeDir,
+          { additionalDirs: agent.getAdditionalDirs() },
+        ),
     });
+    return agent;
   }
 
   private permissionOptions(
@@ -845,6 +830,7 @@ export class Session {
     try {
       const agent = this.instantiateAgent(id, meta.homedir, meta.type, {}, parentAgentId);
       const result = await agent.resume();
+      this.restoreAgentProfileHandle(agent, meta, parent?.agent);
       this.agents.set(id, agent);
       return { agent, warning: parent?.warning ?? result.warning };
     } catch (error) {
@@ -854,6 +840,34 @@ export class Session {
       }
       throw error;
     }
+  }
+
+  private restoreAgentProfileHandle(
+    agent: Agent,
+    meta: AgentMeta,
+    parentAgent: Agent | undefined,
+  ): void {
+    if (agent.config.systemPrompt === '') return;
+    const profile = this.resolvePersistedProfile(agent, meta, parentAgent);
+    if (profile === undefined) return;
+    agent.setActiveProfile(profile, this.options.kimiHomeDir);
+  }
+
+  private resolvePersistedProfile(
+    agent: Agent,
+    meta: AgentMeta,
+    parentAgent: Agent | undefined,
+  ): ResolvedAgentProfile | undefined {
+    const profileName = agent.config.profileName;
+    if (profileName === undefined) return undefined;
+    if (meta.type === 'sub') {
+      const parentProfileName = parentAgent?.config.profileName;
+      return (
+        DEFAULT_AGENT_PROFILES[parentProfileName ?? 'agent']?.subagents?.[profileName] ??
+        DEFAULT_AGENT_PROFILES['agent']?.subagents?.[profileName]
+      );
+    }
+    return DEFAULT_AGENT_PROFILES[profileName];
   }
 
   private nextGeneratedAgentId(): string {
