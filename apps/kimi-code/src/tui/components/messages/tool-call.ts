@@ -10,7 +10,6 @@ import type { Component, TUI } from '@earendil-works/pi-tui';
 import { highlightLines, langFromPath } from '#/tui/components/media/code-highlight';
 import { renderDiffLinesClustered } from '#/tui/components/media/diff-preview';
 import {
-  BRAILLE_SPINNER_FRAMES,
   COMMAND_PREVIEW_LINES,
   RESULT_PREVIEW_LINES,
   THINKING_PREVIEW_LINES,
@@ -47,7 +46,6 @@ const SUBAGENT_ELAPSED_INTERVAL_MS = 1000;
 const PROGRESS_URL_RE = /https?:\/\/\S+/g;
 const ABORTED_MARK = '⊘';
 const MAX_LIVE_OUTPUT_CHARS = 50_000;
-const SPINNER_INTERVAL_MS = 80;
 
 /** Delay before a long-running foreground Bash/Agent card advertises Ctrl+B. */
 const DETACH_HINT_DELAY_MS = 10_000;
@@ -581,8 +579,6 @@ export class ToolCallComponent extends Container {
   private subagentEndedAtMs: number | undefined;
   private verboseMode = false;
   private mcpVisible = false;
-  private spinnerFrame = 0;
-  private spinnerTimer: ReturnType<typeof setInterval> | undefined;
 
   // ── Live progress lines ──────────────────────────────────────────
   //
@@ -649,9 +645,10 @@ export class ToolCallComponent extends Container {
     | undefined;
 
   override render(width: number): string[] {
-    // In minimal mode with no result, only show the spinner header.
-    // When the tool finishes, render nothing so the component collapses.
-    if (this.shouldSuppressOutput() && this.result !== undefined) {
+    // In minimal mode the transcript collapses entirely — no header bullets,
+    // no spinners, no body. The activity pane's single "working" indicator is
+    // the only loading feedback. Press Ctrl+W (verbose mode) to see details.
+    if (this.shouldSuppressOutput()) {
       return [];
     }
 
@@ -1107,20 +1104,13 @@ export class ToolCallComponent extends Container {
   }
 
   private startSpinnerTimer(): void {
-    if (this.result !== undefined) return;
-    if (this.ui === undefined || this.spinnerTimer !== undefined) return;
-    this.spinnerTimer = setInterval(() => {
-      this.spinnerFrame = (this.spinnerFrame + 1) % BRAILLE_SPINNER_FRAMES.length;
-      this.headerText.setText(this.buildHeader());
-      this.invalidate();
-      this.ui?.requestRender();
-    }, SPINNER_INTERVAL_MS);
+    // No-op — per-tool animated spinners were removed in favor of a single
+    // activity-pane indicator.
   }
 
   private stopSpinnerTimer(): void {
-    if (this.spinnerTimer === undefined) return;
-    clearInterval(this.spinnerTimer);
-    this.spinnerTimer = undefined;
+    // No-op — per-tool animated spinners were removed in favor of a single
+    // activity-pane indicator.
   }
 
   /**
@@ -1449,12 +1439,10 @@ export class ToolCallComponent extends Container {
     const { toolCall, result } = this;
     const isFinished = result !== undefined;
 
-    // In minimal mode (output suppressed), show only a spinner while the
-    // tool is executing, and nothing when finished.
+    // In minimal mode the header is blank — the component itself is collapsed
+    // via render(), so return '' here to keep headerText empty as well.
     if (this.shouldSuppressOutput()) {
-      if (isFinished) return '';
-      const frame = BRAILLE_SPINNER_FRAMES[this.spinnerFrame] ?? BRAILLE_SPINNER_FRAMES[0]!;
-      return `${currentTheme.fg('text', STATUS_BULLET)}${frame}`;
+      return '';
     }
 
     // ── Verbose mode — original rendering below ──────────────────────

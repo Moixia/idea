@@ -42,6 +42,7 @@ export class ReadGroupComponent extends Container {
   private throttleTimer: ReturnType<typeof setTimeout> | null = null;
   private lastFlushPhases = new Map<string, ToolCallReadSnapshot['phase']>();
   private _invalidating = false;
+  private suppressed = true;
 
   constructor(private readonly ui: TUI | undefined) {
     super();
@@ -50,6 +51,16 @@ export class ReadGroupComponent extends Container {
     this.addChild(this.headerText);
     this.bodyContainer = new Container();
     this.addChild(this.bodyContainer);
+  }
+
+  setVerboseMode(verbose: boolean): void {
+    this.suppressed = !verbose;
+    this.flushRender();
+  }
+
+  override render(width: number): string[] {
+    if (this.suppressed) return [];
+    return super.render(width);
   }
 
   size(): number {
@@ -95,6 +106,14 @@ export class ReadGroupComponent extends Container {
   }
 
   private flushRender(): void {
+    if (this.suppressed) {
+      this.headerText.setText('');
+      this.bodyContainer.clear();
+      this.invalidate();
+      this.ui?.requestRender();
+      return;
+    }
+
     if (this.throttleTimer !== null) {
       clearTimeout(this.throttleTimer);
       this.throttleTimer = null;
@@ -155,7 +174,7 @@ export class ReadGroupComponent extends Container {
 
   private buildBodyLine(snap: ToolCallReadSnapshot, isLast: boolean): string {
     const dim = (text: string): string => currentTheme.dim(text);
-    const branch = isLast ? '└─' : '├─';
+    const branch = isLast ? '╰─' : '├─';
     const path = snap.filePath ?? '';
     const pathPart = currentTheme.fg('text', path);
 

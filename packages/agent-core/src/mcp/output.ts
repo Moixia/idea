@@ -279,7 +279,7 @@ function collapseSingleText(parts: readonly ContentPart[]): string | ContentPart
  * Disabled via `KIMI_CODE_MCP_TOON_DISABLE=1` to compare against raw JSON.
  */
 function applyToonEncoding(parts: readonly ContentPart[]): ContentPart[] {
-  if (process.env.KIMI_CODE_MCP_TOON_DISABLE === '1') {
+  if (process.env['KIMI_CODE_MCP_TOON_DISABLE'] === '1') {
     return [...parts];
   }
   return parts.map((part) => {

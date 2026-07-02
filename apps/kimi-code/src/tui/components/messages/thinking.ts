@@ -5,13 +5,12 @@
  * Supports expand/collapse via Ctrl+O (shared with tool output).
  */
 
-import { Text, truncateToWidth, type Component, type TUI } from '@earendil-works/pi-tui';
+import { Text, type Component, type TUI } from '@earendil-works/pi-tui';
 
 import {
   BRAILLE_SPINNER_FRAMES,
   BRAILLE_SPINNER_INTERVAL_MS,
   MESSAGE_INDENT,
-  THINKING_PREVIEW_LINES,
 } from '#/tui/constant/rendering';
 import { STATUS_BULLET } from '#/tui/constant/symbols';
 import { currentTheme } from '#/tui/theme';
@@ -115,26 +114,13 @@ export class ThinkingComponent implements Component {
         ...visibleLines.map((line) => MESSAGE_INDENT + line),
       ];
     } else {
+      // finalized — show full content without truncation.
       const lines: string[] = [''];
       for (let i = 0; i < contentLines.length; i++) {
         const p = i === 0 && this.showMarker ? currentTheme.fg('textDim', STATUS_BULLET) : MESSAGE_INDENT;
         lines.push(p + contentLines[i]);
       }
-
-      if (this.expanded || contentLines.length <= THINKING_PREVIEW_LINES) {
-        rendered = lines;
-      } else {
-        // Leading blank + first PREVIEW_LINES content lines + hint line.
-        const truncated = lines.slice(0, 1 + THINKING_PREVIEW_LINES);
-        const remaining = contentLines.length - THINKING_PREVIEW_LINES;
-        const hint = `... (${String(remaining)} more lines, ctrl+o to expand)`;
-        const indentWidth = Math.min(MESSAGE_INDENT.length, Math.max(0, width));
-        const hintWidth = Math.max(0, width - indentWidth);
-        truncated.push(
-          ' '.repeat(indentWidth) + currentTheme.dim(truncateToWidth(hint, hintWidth, '…')),
-        );
-        rendered = truncated;
-      }
+      rendered = lines;
     }
 
     if (isRenderCacheEnabled()) {

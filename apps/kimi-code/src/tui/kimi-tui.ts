@@ -81,6 +81,8 @@ import {
 } from './components/messages/status-message';
 import { ThinkingComponent } from './components/messages/thinking';
 import { StepSummaryComponent } from './components/messages/step-summary';
+import { AgentGroupComponent } from './components/messages/agent-group';
+import { ReadGroupComponent } from './components/messages/read-group';
 import { ToolCallComponent } from './components/messages/tool-call';
 import { UserMessageComponent } from './components/messages/user-message';
 import { ActivityPaneComponent, type ActivityPaneMode } from './components/panes/activity-pane';
@@ -1493,7 +1495,6 @@ export class KimiTUI {
     this.sessionEventHandler.resetRuntimeState();
     this.tasksBrowserController.close();
     this.btwPanelController.clear();
-    this.state.footer.setBackgroundCounts({ bashTasks: 0, agentTasks: 0 });
     this.streamingUI.setTodoList([]);
     this.streamingUI.setTurnId(undefined);
     this.setAppState({ mcpServersSummary: null });
@@ -1748,38 +1749,11 @@ export class KimiTUI {
   }
 
   private appendApprovalTranscriptEntry(
-    request: ApprovalRequest,
-    response: ApprovalResponse,
+    _request: ApprovalRequest,
+    _response: ApprovalResponse,
   ): void {
-    if (
-      request.toolName === 'ExitPlanMode' ||
-      request.display.kind === 'plan_review' ||
-      request.display.kind === 'goal_start'
-    )
-      return;
-    const parts: string[] = [];
-    switch (response.decision) {
-      case 'approved':
-        parts.push(response.scope === 'session' ? 'Approved for session' : 'Approved');
-        break;
-      case 'rejected':
-        parts.push('Rejected');
-        break;
-      case 'cancelled':
-        parts.push('Cancelled');
-        break;
-    }
-    parts.push(`: ${request.action}`);
-    if (response.feedback !== undefined && response.feedback.length > 0) {
-      parts.push(` — "${response.feedback}"`);
-    }
-    this.appendTranscriptEntry({
-      id: nextTranscriptId(),
-      kind: 'status',
-      turnId: request.turnId === undefined ? undefined : String(request.turnId),
-      renderMode: 'notice',
-      content: parts.join(''),
-    });
+    // Suppressed — approval notices (Approved/Rejected/Cancelled: ...) add
+    // visual noise for little value. The approval panel itself still works.
   }
 
   private renderWelcome(): void {
@@ -2250,6 +2224,10 @@ export class KimiTUI {
     for (let i = 0; i < children.length; i++) {
       const child = children[i]!;
       if (child instanceof ToolCallComponent) {
+        child.setVerboseMode(this.state.verboseMode);
+      } else if (child instanceof AgentGroupComponent) {
+        child.setVerboseMode(this.state.verboseMode);
+      } else if (child instanceof ReadGroupComponent) {
         child.setVerboseMode(this.state.verboseMode);
       }
     }

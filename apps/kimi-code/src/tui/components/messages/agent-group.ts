@@ -49,6 +49,7 @@ export class AgentGroupComponent extends Container {
   private throttleTimer: ReturnType<typeof setTimeout> | null = null;
   private lastFlushPhases = new Map<string, ToolCallSubagentSnapshot['phase']>();
   private _invalidating = false;
+  private suppressed = true;
 
   constructor(private readonly ui: TUI | undefined) {
     super();
@@ -57,6 +58,16 @@ export class AgentGroupComponent extends Container {
     this.addChild(this.headerText);
     this.bodyContainer = new Container();
     this.addChild(this.bodyContainer);
+  }
+
+  setVerboseMode(verbose: boolean): void {
+    this.suppressed = !verbose;
+    this.flushRender();
+  }
+
+  override render(width: number): string[] {
+    if (this.suppressed) return [];
+    return super.render(width);
   }
 
   size(): number {
@@ -121,6 +132,14 @@ export class AgentGroupComponent extends Container {
   }
 
   private flushRender(): void {
+    if (this.suppressed) {
+      this.headerText.setText('');
+      this.bodyContainer.clear();
+      this.invalidate();
+      this.ui?.requestRender();
+      return;
+    }
+
     if (this.throttleTimer !== null) {
       clearTimeout(this.throttleTimer);
       this.throttleTimer = null;
@@ -180,7 +199,7 @@ export class AgentGroupComponent extends Container {
     const dim = (text: string) => currentTheme.dim(text);
 
     // First-level branch line.
-    const branch1 = isLast ? '└─' : '├─';
+    const branch1 = isLast ? '╰─' : '├─';
     const agentType = snap.agentName ?? 'agent';
     const desc = snap.toolCallDescription || '(no description)';
     const tail = formatLineTail(snap);

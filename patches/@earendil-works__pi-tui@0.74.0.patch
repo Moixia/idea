@@ -1,0 +1,22 @@
+diff --git a/dist/components/markdown.js b/dist/components/markdown.js
+index 7dc27474f3e6e61be59d448f40c0a4e6b249e2b8..20a5b3a766787b3de16f16c9711058d3bad84583 100644
+--- a/dist/components/markdown.js
++++ b/dist/components/markdown.js
+@@ -638,7 +638,7 @@ export class Markdown {
+         }
+         // Render top border
+         const topBorderCells = columnWidths.map((w) => "─".repeat(w));
+-        lines.push(`┌─${topBorderCells.join("─┬─")}─┐`);
++        lines.push(`╭─${topBorderCells.join("─┬─")}─╮`);
+         // Render header with wrapping
+         const headerCellLines = token.header.map((cell, i) => {
+             const text = this.renderInlineTokens(cell.tokens || [], styleContext);
+@@ -678,7 +678,7 @@ export class Markdown {
+         }
+         // Render bottom border
+         const bottomBorderCells = columnWidths.map((w) => "─".repeat(w));
+-        lines.push(`└─${bottomBorderCells.join("─┴─")}─┘`);
++        lines.push(`╰─${bottomBorderCells.join("─┴─")}─╯`);
+         if (nextTokenType && nextTokenType !== "space") {
+             lines.push(""); // Add spacing after table
+         }

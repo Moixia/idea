@@ -135,7 +135,10 @@ export class SessionAPIImpl implements PromisableMethods<SessionAPI> {
   async setModel({ agentId, ...payload }: AgentScopedPayload<SetModelPayload>) {
     const realAgent = await this.session.ensureAgentResumed(agentId);
     const result = realAgent.rpcMethods.setModel(payload);
-    await this.session.applyProfileForModel(realAgent, DEFAULT_AGENT_PROFILES['agent']);
+    const profile = DEFAULT_AGENT_PROFILES['agent'];
+    if (profile !== undefined) {
+      await this.session.applyProfileForModel(realAgent, profile);
+    }
     return result;
   }
 

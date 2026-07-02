@@ -124,7 +124,7 @@ export class SessionEventHandler {
       backgroundTasks: this.backgroundTasks,
       backgroundTaskTranscriptedTerminal: this.backgroundTaskTranscriptedTerminal,
       syncBackgroundAgentBadge: () => {
-        this.syncBackgroundTaskBadge();
+        // No-op — footer no longer has a background count badge.
       },
     });
   }
@@ -859,11 +859,14 @@ export class SessionEventHandler {
 
     switch (server.status) {
       case 'connected': {
+        // Landa is an internal sub-agent server; skip the TUI notice entirely.
+        if (server.name === 'lander') {
+          this.mcpServerStatusSpinners.get(server.name)?.stop();
+          this.mcpServerStatusSpinners.delete(server.name);
+          return;
+        }
         const toolStr = `${server.toolCount} tool${server.toolCount === 1 ? '' : 's'}`;
-        const message =
-          server.name === 'lander'
-            ? 'Landa is connected and ready to use!'
-            : `MCP server "${server.name}" connected · ${toolStr} (${server.transport})`;
+        const message = `MCP server "${server.name}" connected · ${toolStr} (${server.transport})`;
         this.finalizeMcpServerStatusRow(server.name, message, 'success');
         return;
       }
@@ -1016,12 +1019,10 @@ export class SessionEventHandler {
         // A foreground subagent detached via Ctrl+B: flip its card to
         // `◐ backgrounded` so it doesn't look like it completed.
         this.host.streamingUI.markSubagentBackgrounded(info.agentId);
-        this.syncBackgroundTaskBadge();
         this.host.tasksBrowserController.repaint();
         return;
       }
       this.appendBackgroundTaskEntry(info);
-      this.syncBackgroundTaskBadge();
       this.host.tasksBrowserController.repaint();
       return;
     }
@@ -1044,13 +1045,8 @@ export class SessionEventHandler {
         }
         this.backgroundTaskTranscriptedTerminal.add(info.taskId);
       }
-      this.syncBackgroundTaskBadge();
       this.host.tasksBrowserController.repaint();
       return;
-    }
-
-    if (previous?.status !== info.status) {
-      this.syncBackgroundTaskBadge();
     }
     this.host.tasksBrowserController.repaint();
   }
@@ -1067,29 +1063,5 @@ export class SessionEventHandler {
       backgroundAgentStatus: status,
     };
     this.host.appendTranscriptEntry(entry);
-  }
-
-  private syncBackgroundTaskBadge(): void {
-    const { state } = this.host;
-    let bashTasks = 0;
-    let agentTasks = 0;
-    for (const info of this.backgroundTasks.values()) {
-      if (
-        info.status === 'completed' ||
-        info.status === 'failed' ||
-        info.status === 'timed_out' ||
-        info.status === 'killed' ||
-        info.status === 'lost'
-      ) {
-        continue;
-      }
-      if (info.kind === 'agent') {
-        agentTasks += 1;
-      } else {
-        bashTasks += 1;
-      }
-    }
-    state.footer.setBackgroundCounts({ bashTasks, agentTasks });
-    state.ui.requestRender();
   }
 }

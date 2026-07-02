@@ -22,6 +22,9 @@ const DEFAULT_APPROVE_TOOLS = new Set([
   'GetGoal',
   'SetGoalBudget',
   'UpdateGoal',
+  // Bash and Edit are auto-approved so commands run without prompting.
+  'Bash',
+  'Edit',
 ]);
 
 const DEFAULT_APPROVE_GLOB_PATTERNS: readonly string[] = [
